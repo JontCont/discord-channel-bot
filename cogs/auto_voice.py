@@ -329,7 +329,7 @@ class AutoVoice(commands.Cog):
         if not has_pw_channel:
             await category.create_text_channel(
                 name=PASSWORD_CHANNEL,
-                topic="📌 規則：直接在此頻道輸入密碼即可加入私人包廂｜密碼由房主私訊取得｜訊息會自動刪除，請放心輸入｜每次只需輸入密碼，不需要加任何指令",
+                topic="輸入包廂密碼即可加入私人語音頻道",
                 reason=f"Private room setup by {interaction.user}",
             )
             results.append(f"#{PASSWORD_CHANNEL}")
@@ -350,10 +350,71 @@ class AutoVoice(commands.Cog):
                 f"✅ 已在「{PRIVATE_CATEGORY}」建立：\n"
                 + "\n".join(f"　• {r}" for r in results)
             )
+            await self._post_password_rules(guild)
         else:
             await interaction.followup.send(
                 f"⏭️ 「{PRIVATE_CATEGORY}」分類和所有頻道已存在。"
             )
+
+    def _build_password_rules_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title="🔑 私人包廂密碼頻道",
+            description=(
+                "在這裡輸入密碼即可加入朋友的私人語音包廂！\n"
+                "━━━━━━━━━━━━━━━━━━━━"
+            ),
+            color=discord.Color.orange(),
+        )
+        embed.add_field(
+            name="📋 使用方式",
+            value=(
+                "1️⃣ 向包廂房主取得密碼\n"
+                "2️⃣ 在此頻道直接輸入密碼\n"
+                "3️⃣ 密碼正確後即可加入語音頻道"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="ℹ️ 注意事項",
+            value=(
+                "• 你的訊息會**自動刪除**，請放心輸入\n"
+                "• 直接輸入密碼即可，不需要加任何指令\n"
+                "• 每組密碼對應一個私人包廂\n"
+                "• 包廂關閉後密碼即失效"
+            ),
+            inline=False,
+        )
+        embed.set_footer(text="💡 房主可透過 /voice-invite 直接邀請成員")
+        return embed
+
+    async def _post_password_rules(self, guild: discord.Guild):
+        """Post or update the rules embed in the password channel."""
+        for cat in guild.categories:
+            if cat.name == PRIVATE_CATEGORY:
+                break
+        else:
+            return
+
+        channel = discord.utils.get(cat.text_channels, name=PASSWORD_CHANNEL)
+        if not channel:
+            return
+
+        embed = self._build_password_rules_embed()
+
+        # Check if bot already posted rules
+        async for msg in channel.history(limit=10):
+            if msg.author == self.bot.user and msg.embeds:
+                if msg.embeds[0].title == embed.title:
+                    await msg.edit(embed=embed)
+                    return
+
+        await channel.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Post password rules embed on startup."""
+        for guild in self.bot.guilds:
+            await self._post_password_rules(guild)
 
     @setup_voice.error
     @setup_private.error
