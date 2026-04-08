@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   bot:
-    build: .
+    image: johncons/discord-channel-bot:1.0.0
     container_name: discord-channel-bot
     env_file: .env
     restart: unless-stopped
