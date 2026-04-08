@@ -329,7 +329,7 @@ class AutoVoice(commands.Cog):
         if not has_pw_channel:
             await category.create_text_channel(
                 name=PASSWORD_CHANNEL,
-                topic="輸入包廂密碼即可加入私人語音頻道，訊息會自動刪除。",
+                topic="📌 規則：直接在此頻道輸入密碼即可加入私人包廂｜密碼由房主私訊取得｜訊息會自動刪除，請放心輸入｜每次只需輸入密碼，不需要加任何指令",
                 reason=f"Private room setup by {interaction.user}",
             )
             results.append(f"#{PASSWORD_CHANNEL}")
