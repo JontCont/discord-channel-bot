@@ -8,6 +8,22 @@ SKILL_PREFIX = "湯技："
 SKILL_PANEL_CHANNEL = "湯技"
 
 
+def _find_skill_role(
+    guild: discord.Guild, name: str, emoji: str | None = None
+) -> discord.Role | None:
+    """Find skill role by checking multiple name formats (plain, prefixed, with emoji)."""
+    name = name.strip()
+    candidates = {name, f"{SKILL_PREFIX}{name}"}
+    if emoji:
+        candidates.add(f"{name} {emoji}")
+        candidates.add(f"{SKILL_PREFIX}{name} {emoji}")
+
+    for role in guild.roles:
+        if role.name.strip() in candidates:
+            return role
+    return None
+
+
 class SkillToggleButton(discord.ui.Button):
     """A single skill toggle button."""
 
@@ -19,14 +35,10 @@ class SkillToggleButton(discord.ui.Button):
             custom_id=f"skill_toggle:{skill_name}",
         )
         self.skill_name = skill_name
+        self._emoji_str = emoji
 
     async def callback(self, interaction: discord.Interaction):
-        # Check both plain name and prefixed name
-        role = discord.utils.get(interaction.guild.roles, name=self.skill_name)
-        if not role:
-            role = discord.utils.get(
-                interaction.guild.roles, name=f"{SKILL_PREFIX}{self.skill_name}"
-            )
+        role = _find_skill_role(interaction.guild, self.skill_name, self._emoji_str)
         if not role:
             await interaction.response.send_message(
                 f"❌ 找不到角色 **{self.skill_name}**。", ephemeral=True
@@ -68,9 +80,9 @@ class SkillCommands(commands.GroupCog, name="skill"):
         skills = []
         for cat in guild.categories:
             if cat.name.startswith(SKILL_PREFIX):
-                rest = cat.name.removeprefix(SKILL_PREFIX)
+                rest = cat.name.removeprefix(SKILL_PREFIX).strip()
                 parts = rest.split(" ", 1)
-                skill_name = parts[0]
+                skill_name = parts[0].strip()
                 emoji = parts[1].strip() if len(parts) > 1 else None
                 skills.append((skill_name, emoji))
         return skills
@@ -157,10 +169,7 @@ class SkillCommands(commands.GroupCog, name="skill"):
     @staticmethod
     def _find_role(guild: discord.Guild, name: str) -> discord.Role | None:
         """Find role by name, checking both plain and prefixed formats."""
-        for role in guild.roles:
-            if role.name == name or role.name == f"{SKILL_PREFIX}{name}":
-                return role
-        return None
+        return _find_skill_role(guild, name)
 
     async def _skill_autocomplete(
         self, interaction: discord.Interaction, current: str
