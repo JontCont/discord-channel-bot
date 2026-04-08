@@ -3,7 +3,7 @@ import logging
 import discord
 from discord.ext import commands
 
-from config import DISCORD_TOKEN, BOT_PREFIX
+from config import DISCORD_TOKEN, BOT_PREFIX, GUILD_ID
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,8 +19,9 @@ bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 COGS = [
     "cogs.general",
-    "cogs.slash_commands",
     "cogs.embeds",
+    "cogs.auto_voice",
+    "cogs.skill_commands",
 ]
 
 
