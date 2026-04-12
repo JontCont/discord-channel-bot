@@ -364,6 +364,59 @@ class Leveling(commands.Cog):
                 "🚫 你需要「管理角色」權限才能使用此指令。", ephemeral=True
             )
 
+    # ── /level-init ──────────────────────────────────────────
+
+    @app_commands.command(
+        name="level-init",
+        description="為所有現有成員初始化等級資料並分配 LV1 身分組",
+    )
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def level_init(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+
+        initialized = 0
+        skipped = 0
+
+        for member in guild.members:
+            if member.bot:
+                continue
+
+            user = await self.db.get_user(member.id, guild.id)
+
+            # Check if member already has any level role
+            has_level_role = any(
+                r.name in self._all_milestone_names() for r in member.roles
+            )
+
+            if has_level_role and user["xp"] > 0:
+                skipped += 1
+                continue
+
+            await self._update_roles(member, user["level"])
+            initialized += 1
+
+        await interaction.followup.send(
+            f"✅ 初始化完成！\n"
+            f"　• 已分配身分組：**{initialized}** 位成員\n"
+            f"　• 已跳過（已有等級）：**{skipped}** 位成員",
+            ephemeral=True,
+        )
+
+    @level_init.error
+    async def level_init_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ):
+        if isinstance(error, app_commands.MissingPermissions):
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    "🚫 你需要「管理角色」權限才能使用此指令。", ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(
+                    "🚫 你需要「管理角色」權限才能使用此指令。", ephemeral=True
+                )
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Leveling(bot))
