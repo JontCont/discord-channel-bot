@@ -37,7 +37,7 @@ XP_DAILY_BASE = int(os.getenv("XP_DAILY_BASE", "50"))
 LEVELUP_CHANNEL = os.getenv("LEVELUP_CHANNEL", "等級公告")
 
 # Level milestones: (level, role_name, color_hex)
-LEVEL_ROLES = [
+_DEFAULT_LEVEL_ROLES = [
     (1,  "🌱 湯友 LV1 新手湯友",  0x95A5A6),
     (5,  "🍵 湯友 LV5 泡湯常客",  0x3498DB),
     (10, "♨️ 湯友 LV10 溫泉達人", 0x2ECC71),
@@ -49,3 +49,17 @@ LEVEL_ROLES = [
     (40, "🐉 湯友 LV40 神湯使者", 0xE91E63),
     (50, "🏆 湯友 LV50 湯神",     0xFFD700),
 ]
+
+
+def _parse_level_roles(raw: str | None) -> list[tuple[int, str, int]]:
+    """Parse LEVEL_ROLES from env: [lv,"name","#COLOR"],[lv,"name","#COLOR"],..."""
+    if not raw:
+        return _DEFAULT_LEVEL_ROLES
+    import re
+    roles = []
+    for m in re.finditer(r'\[(\d+)\s*,\s*"([^"]+)"\s*,\s*"#([0-9A-Fa-f]{6})"\]', raw):
+        roles.append((int(m.group(1)), m.group(2), int(m.group(3), 16)))
+    return roles if roles else _DEFAULT_LEVEL_ROLES
+
+
+LEVEL_ROLES = _parse_level_roles(os.getenv("LEVEL_ROLES"))
