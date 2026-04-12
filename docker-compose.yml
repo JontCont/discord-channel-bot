@@ -1,8 +1,8 @@
 services:
   bot:
-    build: .
     image: johncons/discord-channel-bot:latest
     container_name: discord-channel-bot
+    user: "0:0"
     env_file: .env
     restart: unless-stopped
     volumes:
