@@ -2,10 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import AUTO_VOICE_TRIGGER
-
-SKILL_PREFIX = "湯技："
-SKILL_PANEL_CHANNEL = "湯技"
+from config import AUTO_VOICE_TRIGGER, SKILL_PREFIX, SKILL_PANEL_CHANNEL
 
 
 def _find_skill_role(
