@@ -24,6 +24,7 @@ COGS = [
     "cogs.auto_voice",
     "cogs.private_room",
     "cogs.skill_commands",
+    "cogs.leveling",
 ]
 
 
