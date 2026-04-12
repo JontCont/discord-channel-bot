@@ -9,17 +9,6 @@ class SlashCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="hello", description="和機器人打招呼")
-    async def hello(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            f"👋 嗨 {interaction.user.mention}！我是你的 Discord Bot！"
-        )
-
-    @app_commands.command(name="say", description="讓機器人說一句話")
-    @app_commands.describe(message="要說的內容")
-    async def say(self, interaction: discord.Interaction, message: str):
-        await interaction.response.send_message(message)
-
     @app_commands.command(name="userinfo", description="查看使用者資訊")
     @app_commands.describe(member="要查看的使用者")
     async def userinfo(
