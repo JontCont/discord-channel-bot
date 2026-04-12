@@ -1,5 +1,6 @@
 services:
   bot:
+    build: .
     image: johncons/discord-channel-bot:latest
     container_name: discord-channel-bot
     env_file: .env

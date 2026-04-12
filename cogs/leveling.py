@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 from datetime import datetime, timezone
@@ -5,6 +6,8 @@ from datetime import datetime, timezone
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+
+logger = logging.getLogger("bot.leveling")
 
 from config import (
     LEVELING_DB_PATH,
@@ -48,6 +51,7 @@ class Leveling(commands.Cog):
     async def cog_load(self):
         await self.db.init()
         self.voice_xp_loop.start()
+        logger.info("Leveling cog loaded — on_message listener active")
 
     async def cog_unload(self):
         self.voice_xp_loop.cancel()
@@ -133,11 +137,25 @@ class Leveling(commands.Cog):
         now = time.time()
         last = self._msg_cooldowns.get(message.author.id, 0)
         if now - last < XP_MESSAGE_COOLDOWN:
+            logger.debug(
+                "XP cooldown: user=%s remaining=%.0fs",
+                message.author, XP_MESSAGE_COOLDOWN - (now - last),
+            )
             return
 
         self._msg_cooldowns[message.author.id] = now
         xp = random.randint(XP_PER_MESSAGE_MIN, XP_PER_MESSAGE_MAX)
-        result = await self.db.add_xp(message.author.id, message.guild.id, xp)
+
+        try:
+            result = await self.db.add_xp(message.author.id, message.guild.id, xp)
+        except Exception:
+            logger.exception("Failed to add XP for user %s", message.author)
+            return
+
+        logger.info(
+            "XP awarded: user=%s xp=+%d total=%d level=%d",
+            message.author, xp, result["xp"], result["level"],
+        )
 
         if result["level"] > result["old_level"]:
             await self._update_roles(message.author, result["level"])

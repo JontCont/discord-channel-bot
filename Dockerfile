@@ -19,8 +19,5 @@ COPY . .
 # Change ownership of the app directory to the non-root user
 RUN chown -R botuser:botuser /app
 
-# Switch to non-root user
-USER botuser
-
-# Run the bot
-CMD ["python", "bot.py"]
+# Use entrypoint to fix mounted volume permissions then drop to botuser
+ENTRYPOINT ["sh", "-c", "chown -R botuser:botuser /app/data /app/logs 2>/dev/null; exec su -s /bin/sh botuser -c 'python bot.py'"]
