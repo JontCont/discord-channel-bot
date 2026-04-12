@@ -1,6 +1,6 @@
 services:
   bot:
-    image: johncons/discord-channel-bot:1.1.0
+    image: johncons/discord-channel-bot:latest
     container_name: discord-channel-bot
     env_file: .env
     restart: unless-stopped
