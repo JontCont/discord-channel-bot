@@ -138,6 +138,7 @@ discord-channel-bot/
 | `PASSWORD_CHANNEL` | — | 依語系 | 密碼輸入頻道名稱 |
 | `SKILL_PREFIX` | — | 依語系 | 湯技分類前綴 |
 | `SKILL_PANEL_CHANNEL` | — | 依語系 | 湯技面板頻道名稱 |
+| `SKILL_PANEL_DIRECT_JOIN_SKILLS` | — | `鍛造術,遊戲術,墨繪術,幻想術` | `/skill panel` 未指定 direct_join_skills 時，預設可按鈕直接加入的湯技清單 |
 | `LEVELING_DB_PATH` | — | `data/leveling.db` | 等級資料庫檔案路徑 |
 | `XP_PER_MESSAGE_MIN` | — | `15` | 每則訊息最低 XP |
 | `XP_PER_MESSAGE_MAX` | — | `25` | 每則訊息最高 XP |
@@ -199,7 +200,7 @@ discord-channel-bot/
 | `/skill regen <名稱>` | 管理角色 | 重新產生該湯技邀請碼（管理員可輪替邀請碼） |
 | `/skill list` | — | 列出所有湯技及成員數量 |
 | `/skill setup` | 管理角色 | 修復現有湯技的缺失頻道 |
-| `/skill panel` | 管理角色 | 發送互動按鈕面板（顯示湯技並可一鍵離開；加入需邀請碼） |
+| `/skill panel` | 管理角色 | 發送互動按鈕面板（可直接加入清單由 `SKILL_PANEL_DIRECT_JOIN_SKILLS` 控制；其餘維持邀請碼） |
 
 ### 活躍值等級系統（slash/leveling.py）
 

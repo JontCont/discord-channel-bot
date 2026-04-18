@@ -87,6 +87,25 @@ SKILL_PANEL_CHANNEL = _get_localized_env(
     "skills",
 )
 
+
+def _parse_name_list(raw: str) -> list[str]:
+    import re
+
+    parsed: list[str] = []
+    for part in re.split(r"[,，、]", raw):
+        name = part.strip()
+        if name and name not in parsed:
+            parsed.append(name)
+    return parsed
+
+
+SKILL_PANEL_DIRECT_JOIN_SKILLS = _parse_name_list(
+    os.getenv(
+        "SKILL_PANEL_DIRECT_JOIN_SKILLS",
+        "鍛造術,遊戲術,墨繪術,幻想術",
+    )
+)
+
 # Leveling settings
 LEVELING_DB_PATH = os.getenv("LEVELING_DB_PATH", "data/leveling.db")
 XP_PER_MESSAGE_MIN = int(os.getenv("XP_PER_MESSAGE_MIN", "15"))
