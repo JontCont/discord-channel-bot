@@ -98,18 +98,14 @@ discord-channel-bot/
 │   │   ├── embeds.py         # Embed 訊息指令
 │   │   ├── auto_voice.py     # 公開自動語音頻道
 │   │   ├── private_room.py   # 私人包廂 & 密碼系統
+│   │   ├── skill_commands.py # 湯技角色系統
 │   │   └── leveling.py       # 活躍值等級系統
-│   ├── service/              # 共用服務層
-│   │   └── room_registry.py  # 語音房共享狀態管理
 │   ├── repository/           # 共用資料層
-│   │   └── leveling_db.py    # 等級資料庫層 (SQLite)
-│   ├── skills/               # 湯技三層架構
-│   │   ├── slash/            # 表現層：Slash 指令
-│   │   │   └── skill_commands.py
-│   │   ├── repository/       # 資料層：邀請碼儲存
-│   │   │   └── skill_invite_repository.py
-│   │   └── service/          # 業務層：湯技規則與流程
-│   │       └── skill_service.py
+│   │   ├── leveling_db.py    # 等級資料庫層 (SQLite)
+│   │   └── skill_invite_repository.py # 湯技邀請碼資料層
+│   └── service/              # 共用服務層
+│       ├── room_registry.py  # 語音房共享狀態管理
+│       └── skill_service.py  # 湯技規則與流程
 ├── data/                     # 資料目錄（等級資料庫）
 ├── Dockerfile                # Docker 映像定義
 ├── docker-compose.yml        # Docker Compose 設定
@@ -190,7 +186,7 @@ discord-channel-bot/
 | `/voice-invite <使用者>` | 房主 | 邀請使用者加入私人語音房 |
 | `/setup-private` | 管理頻道 | 建立私人包廂分類與密碼輸入頻道 |
 
-### 湯技角色系統（skills/slash/skill_commands.py）
+### 湯技角色系統（slash/skill_commands.py）
 
 | 指令 | 權限需求 | 說明 |
 |---|---|---|

@@ -23,7 +23,7 @@ COGS = [
     "cogs.slash.slash_commands",
     "cogs.slash.auto_voice",
     "cogs.slash.private_room",
-    "cogs.skills.slash.skill_commands",
+    "cogs.slash.skill_commands",
     "cogs.slash.leveling",
 ]
 

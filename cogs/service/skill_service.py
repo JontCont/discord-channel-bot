@@ -3,7 +3,7 @@ import secrets
 import discord
 
 from config import AUTO_VOICE_TRIGGER, SKILL_PREFIX
-from cogs.skills.repository import SkillInviteRepository
+from cogs.repository.skill_invite_repository import SkillInviteRepository
 
 
 class SkillService:

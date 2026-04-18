@@ -3,8 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 
 from config import AUTO_VOICE_TRIGGER, SKILL_PREFIX, SKILL_PANEL_CHANNEL
-from cogs.skills.repository import SkillInviteRepository
-from cogs.skills.service import SkillService
+from cogs.repository.skill_invite_repository import SkillInviteRepository
+from cogs.service.skill_service import SkillService
 
 
 class SkillToggleButton(discord.ui.Button):
