@@ -126,17 +126,18 @@ discord-channel-bot/
 | `DISCORD_TOKEN` | ✅ | — | 你的 Discord Bot Token |
 | `BOT_PREFIX` | — | `!` | 前綴指令符號 |
 | `LOG_LEVEL` | — | `INFO` | 日誌等級（DEBUG / INFO / WARNING / ERROR） |
+| `BOT_LANGUAGE` | — | `zh-TW` | 語系預設（如 `zh-TW` / `en-US`）。未自訂名稱時會套用對應語言預設值 |
 | `GUILD_ID` | — | — | 開發用伺服器 ID，設定後 Slash 指令會即時同步到該伺服器 |
-| `AUTO_VOICE_TRIGGER` | — | `➕ 建立語音頻道` | 公開語音房觸發頻道名稱 |
-| `AUTO_VOICE_SUFFIX` | — | `語音房` | 自動建立的語音頻道後綴名 |
+| `AUTO_VOICE_TRIGGER` | — | 依語系 | 公開語音房觸發頻道名稱 |
+| `AUTO_VOICE_SUFFIX` | — | 依語系 | 自動建立的語音頻道後綴名 |
 | `AUTO_VOICE_LIMIT` | — | `6` | 公開語音房預設人數上限 |
-| `PRIVATE_CATEGORY` | — | `🔒 私人湯` | 私人包廂分類名稱 |
-| `PRIVATE_TRIGGER` | — | `➕ 開設私人包廂` | 私人包廂觸發頻道名稱 |
-| `PRIVATE_SUFFIX` | — | `的包廂` | 私人包廂頻道後綴名 |
+| `PRIVATE_CATEGORY` | — | 依語系 | 私人包廂分類名稱 |
+| `PRIVATE_TRIGGER` | — | 依語系 | 私人包廂觸發頻道名稱 |
+| `PRIVATE_SUFFIX` | — | 依語系 | 私人包廂頻道後綴名 |
 | `PRIVATE_LIMIT` | — | `4` | 私人包廂預設人數上限 |
-| `PASSWORD_CHANNEL` | — | `🔑｜輸入密碼` | 密碼輸入頻道名稱 |
-| `SKILL_PREFIX` | — | `湯技：` | 湯技分類前綴 |
-| `SKILL_PANEL_CHANNEL` | — | `湯技` | 湯技面板頻道名稱 |
+| `PASSWORD_CHANNEL` | — | 依語系 | 密碼輸入頻道名稱 |
+| `SKILL_PREFIX` | — | 依語系 | 湯技分類前綴 |
+| `SKILL_PANEL_CHANNEL` | — | 依語系 | 湯技面板頻道名稱 |
 | `LEVELING_DB_PATH` | — | `data/leveling.db` | 等級資料庫檔案路徑 |
 | `XP_PER_MESSAGE_MIN` | — | `15` | 每則訊息最低 XP |
 | `XP_PER_MESSAGE_MAX` | — | `25` | 每則訊息最高 XP |
@@ -144,8 +145,8 @@ discord-channel-bot/
 | `XP_PER_VOICE_TICK` | — | `10` | 語音掛機每次獲得的 XP |
 | `XP_VOICE_INTERVAL` | — | `300` | 語音 XP 計算間隔（秒） |
 | `XP_DAILY_BASE` | — | `50` | 每日簽到基礎 XP |
-| `LEVELUP_CHANNEL` | — | `等級公告` | 升級公告頻道名稱 |
-| `LEVEL_ROLES` | — | （內建 10 階） | 等級里程碑角色，格式：`[lv,"名稱","#HEX"],...` |
+| `LEVELUP_CHANNEL` | — | 依語系 | 升級公告頻道名稱 |
+| `LEVEL_ROLES` | — | （內建 10 階，依語系） | 等級里程碑角色，格式：`[lv,"名稱","#HEX"],...` |
 
 ---
 

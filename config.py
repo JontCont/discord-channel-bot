@@ -3,28 +3,89 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _is_english(lang: str) -> bool:
+    normalized = (lang or "").lower()
+    return normalized.startswith("en")
+
+
+def _pick_by_language(lang: str, zh_text: str, en_text: str) -> str:
+    return en_text if _is_english(lang) else zh_text
+
+
+def _get_localized_env(key: str, lang: str, zh_default: str, en_default: str) -> str:
+    value = os.getenv(key)
+    if value is None or value == "":
+        return _pick_by_language(lang, zh_default, en_default)
+    return value
+
+
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# i18n settings
+# Supported examples: zh-TW, zh-CN, en-US, en
+BOT_LANGUAGE = os.getenv("BOT_LANGUAGE", "zh-TW")
 
 # Guild ID for instant slash command sync (optional, recommended for dev)
 GUILD_ID = os.getenv("GUILD_ID", "")
 
 # Auto-voice settings
-AUTO_VOICE_TRIGGER = os.getenv("AUTO_VOICE_TRIGGER", "➕ 建立語音頻道")
-AUTO_VOICE_SUFFIX = os.getenv("AUTO_VOICE_SUFFIX", "語音房")
+AUTO_VOICE_TRIGGER = _get_localized_env(
+    "AUTO_VOICE_TRIGGER",
+    BOT_LANGUAGE,
+    "➕ 建立語音頻道",
+    "➕ Create Voice Channel",
+)
+AUTO_VOICE_SUFFIX = _get_localized_env(
+    "AUTO_VOICE_SUFFIX",
+    BOT_LANGUAGE,
+    "語音房",
+    "Voice Room",
+)
 AUTO_VOICE_LIMIT = int(os.getenv("AUTO_VOICE_LIMIT", "6"))
 
 # Private room settings
-PRIVATE_CATEGORY = os.getenv("PRIVATE_CATEGORY", "🔒 私人湯")
-PRIVATE_TRIGGER = os.getenv("PRIVATE_TRIGGER", "➕ 開設私人包廂")
-PRIVATE_SUFFIX = os.getenv("PRIVATE_SUFFIX", "的包廂")
+PRIVATE_CATEGORY = _get_localized_env(
+    "PRIVATE_CATEGORY",
+    BOT_LANGUAGE,
+    "🔒 私人湯",
+    "🔒 Private Rooms",
+)
+PRIVATE_TRIGGER = _get_localized_env(
+    "PRIVATE_TRIGGER",
+    BOT_LANGUAGE,
+    "➕ 開設私人包廂",
+    "➕ Create Private Room",
+)
+PRIVATE_SUFFIX = _get_localized_env(
+    "PRIVATE_SUFFIX",
+    BOT_LANGUAGE,
+    "的包廂",
+    "'s Room",
+)
 PRIVATE_LIMIT = int(os.getenv("PRIVATE_LIMIT", "4"))
-PASSWORD_CHANNEL = os.getenv("PASSWORD_CHANNEL", "🔑｜輸入密碼")
+PASSWORD_CHANNEL = _get_localized_env(
+    "PASSWORD_CHANNEL",
+    BOT_LANGUAGE,
+    "🔑｜輸入密碼",
+    "🔑-password",
+)
 
 # Skill settings
-SKILL_PREFIX = os.getenv("SKILL_PREFIX", "湯技：")
-SKILL_PANEL_CHANNEL = os.getenv("SKILL_PANEL_CHANNEL", "湯技")
+SKILL_PREFIX = _get_localized_env(
+    "SKILL_PREFIX",
+    BOT_LANGUAGE,
+    "湯技：",
+    "Skill: ",
+)
+SKILL_PANEL_CHANNEL = _get_localized_env(
+    "SKILL_PANEL_CHANNEL",
+    BOT_LANGUAGE,
+    "湯技",
+    "skills",
+)
 
 # Leveling settings
 LEVELING_DB_PATH = os.getenv("LEVELING_DB_PATH", "data/leveling.db")
@@ -34,10 +95,15 @@ XP_MESSAGE_COOLDOWN = int(os.getenv("XP_MESSAGE_COOLDOWN", "60"))
 XP_PER_VOICE_TICK = int(os.getenv("XP_PER_VOICE_TICK", "10"))
 XP_VOICE_INTERVAL = int(os.getenv("XP_VOICE_INTERVAL", "300"))
 XP_DAILY_BASE = int(os.getenv("XP_DAILY_BASE", "50"))
-LEVELUP_CHANNEL = os.getenv("LEVELUP_CHANNEL", "等級公告")
+LEVELUP_CHANNEL = _get_localized_env(
+    "LEVELUP_CHANNEL",
+    BOT_LANGUAGE,
+    "等級公告",
+    "level-up",
+)
 
 # Level milestones: (level, role_name, color_hex)
-_DEFAULT_LEVEL_ROLES = [
+_DEFAULT_LEVEL_ROLES_ZH = [
     (1,  "🌱 湯友 LV1 新手湯友",  0x95A5A6),
     (5,  "🍵 湯友 LV5 泡湯常客",  0x3498DB),
     (10, "♨️ 湯友 LV10 溫泉達人", 0x2ECC71),
@@ -49,6 +115,23 @@ _DEFAULT_LEVEL_ROLES = [
     (40, "🐉 湯友 LV40 神湯使者", 0xE91E63),
     (50, "🏆 湯友 LV50 湯神",     0xFFD700),
 ]
+
+_DEFAULT_LEVEL_ROLES_EN = [
+    (1,  "🌱 Soaker LV1 Beginner",     0x95A5A6),
+    (5,  "🍵 Soaker LV5 Regular",      0x3498DB),
+    (10, "♨️ Soaker LV10 Hot Spring Pro", 0x2ECC71),
+    (15, "🔥 Soaker LV15 Brave Bather", 0xE67E22),
+    (20, "💎 Soaker LV20 Elite",        0x9B59B6),
+    (25, "⚡ Soaker LV25 Legend",       0xF1C40F),
+    (30, "🌟 Soaker LV30 Celebrity",    0xE74C3C),
+    (35, "👑 Soaker LV35 Overlord",     0x1ABC9C),
+    (40, "🐉 Soaker LV40 Spirit Envoy", 0xE91E63),
+    (50, "🏆 Soaker LV50 Bath Deity",   0xFFD700),
+]
+
+_DEFAULT_LEVEL_ROLES = (
+    _DEFAULT_LEVEL_ROLES_EN if _is_english(BOT_LANGUAGE) else _DEFAULT_LEVEL_ROLES_ZH
+)
 
 
 def _parse_level_roles(raw: str | None) -> list[tuple[int, str, int]]:
