@@ -76,29 +76,41 @@ class SkillService:
 
     @staticmethod
     def skill_overwrites(guild: discord.Guild, role: discord.Role) -> dict:
+        role_overwrite = discord.PermissionOverwrite(
+            view_channel=True,
+            read_message_history=True,
+            send_messages=True,
+            send_messages_in_threads=True,
+            create_public_threads=True,
+            create_private_threads=True,
+            add_reactions=True,
+            embed_links=True,
+            attach_files=True,
+            use_external_emojis=True,
+            use_application_commands=True,
+            connect=True,
+            speak=True,
+            stream=True,
+            use_voice_activation=True,
+        )
+        if hasattr(discord.Permissions, "use_external_stickers"):
+            role_overwrite.use_external_stickers = True
+        if hasattr(discord.Permissions, "send_polls"):
+            role_overwrite.send_polls = True
+        if hasattr(discord.Permissions, "create_polls"):
+            role_overwrite.create_polls = True
+        if hasattr(discord.Permissions, "use_embedded_activities"):
+            role_overwrite.use_embedded_activities = True
+        if hasattr(discord.Permissions, "start_embedded_activities"):
+            role_overwrite.start_embedded_activities = True
+
         return {
             guild.default_role: discord.PermissionOverwrite(
                 view_channel=True,
                 send_messages=False,
                 connect=False,
             ),
-            role: discord.PermissionOverwrite(
-                view_channel=True,
-                read_message_history=True,
-                send_messages=True,
-                send_messages_in_threads=True,
-                create_public_threads=True,
-                create_private_threads=True,
-                add_reactions=True,
-                embed_links=True,
-                attach_files=True,
-                use_external_emojis=True,
-                use_application_commands=True,
-                connect=True,
-                speak=True,
-                stream=True,
-                use_voice_activation=True,
-            ),
+            role: role_overwrite,
         }
 
     async def apply_skill_permissions(

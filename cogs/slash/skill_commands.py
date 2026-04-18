@@ -146,6 +146,20 @@ class SkillCommands(commands.GroupCog, name="skill"):
     def _find_role(guild: discord.Guild, name: str) -> discord.Role | None:
         return SkillService.find_role(guild, name)
 
+    @staticmethod
+    def _auto_skill_role_color(name: str) -> discord.Colour:
+        palette = [
+            discord.Colour.blue(),
+            discord.Colour.green(),
+            discord.Colour.purple(),
+            discord.Colour.orange(),
+            discord.Colour.teal(),
+            discord.Colour.magenta(),
+            discord.Colour.gold(),
+        ]
+        index = sum(ord(ch) for ch in name.strip().lower()) % len(palette)
+        return palette[index]
+
     async def _skill_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
@@ -178,8 +192,12 @@ class SkillCommands(commands.GroupCog, name="skill"):
             return
 
         # 1. Create role
+        role_name = name.strip()
+        if not role_name.startswith(SKILL_PREFIX):
+            role_name = f"{SKILL_PREFIX}{role_name}"
         role = await guild.create_role(
-            name=name,
+            name=role_name,
+            colour=self._auto_skill_role_color(name),
             mentionable=True,
             reason=f"Skill create by {interaction.user}",
         )
@@ -193,8 +211,8 @@ class SkillCommands(commands.GroupCog, name="skill"):
             reason=f"Skill create by {interaction.user}",
         )
 
-        # 3. Create text channels
-        await category.create_text_channel(f"{name}-討論")
+        # 3. Create discussion + chat channels
+        await category.create_forum(f"{name}-討論")
         await category.create_text_channel(f"{name}-聊天")
 
         # 4. Create voice trigger channel
@@ -202,14 +220,30 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
         invite_code = self.skill_service.set_invite_code(guild.id, name)
 
-        await interaction.followup.send(
+        dm_status_text = "✅ 已將邀請碼私訊給你。"
+        dm_failed = False
+        try:
+            await interaction.user.send(
+                f"你建立的湯技 **{name}** 邀請碼為：`{invite_code}`\n"
+                f"伺服器：**{guild.name}**\n"
+                "可使用 `/skill info` 查看或重新產生邀請碼。"
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            dm_failed = True
+            dm_status_text = "⚠️ 無法私訊你邀請碼（請確認已開啟私訊）。"
+
+        create_msg = (
             f"✅ 湯技 **{name}** 已建立！\n"
             f"　• 角色：{role.mention}\n"
             f"　• 分類：{category_name}\n"
-            f"　• 頻道：#{name}-討論、#{name}-聊天\n"
+            f"　• 頻道：{name}-討論（論壇）、#{name}-聊天\n"
             f"　• 語音：{AUTO_VOICE_TRIGGER}\n"
-            f"　• 管理員邀請碼：`{invite_code}`"
+            f"　• 邀請碼通知：{dm_status_text}"
         )
+        if dm_failed:
+            create_msg += f"\n　• 備援顯示邀請碼：`{invite_code}`"
+
+        await interaction.followup.send(create_msg, ephemeral=True)
         await self._refresh_panel(guild)
 
     # ── /skill delete ────────────────────────────────────────
@@ -269,6 +303,48 @@ class SkillCommands(commands.GroupCog, name="skill"):
             f"✅ 你已加入湯技 **{name}**！", ephemeral=True
         )
 
+    # ── /skill info ──────────────────────────────────────────
+
+    @app_commands.command(name="info", description="查看湯技詳情（可選擇重新產生邀請碼）")
+    @app_commands.describe(name="湯技名稱", regenerate_invite="是否重新產生邀請碼")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    @app_commands.autocomplete(name=_skill_autocomplete)
+    async def skill_info(
+        self,
+        interaction: discord.Interaction,
+        name: str,
+        regenerate_invite: bool = False,
+    ):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+
+        category = self._find_category(guild, name)
+        role = self._find_role(guild, name)
+
+        if not category and not role:
+            await interaction.followup.send(f"❌ 找不到湯技 **{name}**。", ephemeral=True)
+            return
+
+        skill_name = name.strip()
+        if regenerate_invite:
+            invite_code = self.skill_service.set_invite_code(guild.id, skill_name)
+        else:
+            invite_code = self.skill_service.ensure_invite_code(guild.id, skill_name)
+
+        role_mention = role.mention if role else "（找不到對應角色）"
+        role_name = role.name if role else "（找不到對應角色）"
+        category_name = category.name if category else f"{SKILL_PREFIX}{skill_name}"
+        regen_text = "（已重新產生）" if regenerate_invite else ""
+
+        await interaction.followup.send(
+            f"📌 湯技 **{skill_name}** 詳情\n"
+            f"　• 邀請碼：`{invite_code}` {regen_text}\n"
+            f"　• 權限角色：{role_mention}\n"
+            f"　• 角色名稱：`{role_name}`\n"
+            f"　• 分類：`{category_name}`",
+            ephemeral=True,
+        )
+
     # ── /skill regen ────────────────────────────────────────
 
     @app_commands.command(name="regen", description="重新產生湯技邀請碼")
@@ -322,13 +398,11 @@ class SkillCommands(commands.GroupCog, name="skill"):
         guild = interaction.guild
         skills = []
 
-        for cat in guild.categories:
-            if cat.name.startswith(SKILL_PREFIX):
-                skill_display = cat.name.removeprefix(SKILL_PREFIX)
-                skill_name = skill_display.split(" ")[0]
-                role = self._find_role(guild, skill_name)
-                member_count = len(role.members) if role else 0
-                skills.append(f"• **{skill_display}** — {member_count} 位成員")
+        for skill_name, emoji in self._get_skills(guild):
+            role = self.skill_service.find_role(guild, skill_name, emoji)
+            member_count = len(role.members) if role else 0
+            prefix = f"{emoji} " if emoji else ""
+            skills.append(f"• {prefix}**{skill_name}** — {member_count} 位成員")
 
         if not skills:
             await interaction.response.send_message("目前沒有任何湯技。", ephemeral=True)
@@ -375,11 +449,23 @@ class SkillCommands(commands.GroupCog, name="skill"):
                     f"**{skill_display}**：找不到對應角色，略過權限同步"
                 )
 
-            # Check and create missing text channels
+            # Check and create missing discussion/chat channels
             existing_names = [ch.name for ch in cat.channels]
-            if f"{skill_name}-討論" not in existing_names:
-                await cat.create_text_channel(f"{skill_name}-討論")
-                added.append(f"#{skill_name}-討論")
+            discussion_name = f"{skill_name}-討論"
+            discussion_channel = discord.utils.get(cat.channels, name=discussion_name)
+            if not discussion_channel:
+                await cat.create_forum(discussion_name)
+                added.append(f"{discussion_name}（論壇）")
+            elif isinstance(discussion_channel, discord.TextChannel):
+                legacy_name = f"{discussion_name}-舊文字"
+                if legacy_name in existing_names:
+                    legacy_name = f"{discussion_name}-legacy"
+                await discussion_channel.edit(
+                    name=legacy_name,
+                    reason=f"Skill setup migrate forum by {interaction.user}",
+                )
+                await cat.create_forum(discussion_name)
+                added.append(f"{discussion_name}（論壇，已保留舊頻道 #{legacy_name}）")
             if f"{skill_name}-聊天" not in existing_names:
                 await cat.create_text_channel(f"{skill_name}-聊天")
                 added.append(f"#{skill_name}-聊天")
@@ -435,6 +521,7 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     @skill_create.error
     @skill_delete.error
+    @skill_info.error
     @skill_regen.error
     @skill_setup.error
     @skill_panel.error
@@ -450,3 +537,4 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(SkillCommands(bot))
+

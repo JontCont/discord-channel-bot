@@ -45,7 +45,7 @@ class SkillInviteRepository:
             del self._codes[key]
             self._save()
 
-    def codes_for_guild(self, guild_id: int) -> set[str]:
+    def codes_for_guild(self, guild_id: int) -> "set[str]":
         return {
             code for key, code in self._codes.items() if key.startswith(f"{guild_id}:")
         }

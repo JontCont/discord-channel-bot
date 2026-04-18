@@ -1,6 +1,9 @@
 services:
   bot:
-    image: johncons/discord-channel-bot:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: discord-channel-bot:local
     container_name: discord-channel-bot
     user: "0:0"
     env_file: .env
