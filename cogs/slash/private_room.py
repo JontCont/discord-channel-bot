@@ -270,7 +270,7 @@ class PrivateRoom(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    from cogs.room_registry import RoomRegistry
+    from cogs.service.room_registry import RoomRegistry
 
     if not hasattr(bot, "room_registry"):
         bot.room_registry = RoomRegistry()

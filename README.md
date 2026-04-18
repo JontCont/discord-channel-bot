@@ -91,15 +91,25 @@ discord-channel-bot/
 ├── config.py                 # 環境變數設定
 ├── cogs/
 │   ├── __init__.py
-│   ├── general.py            # 基本指令 (ping, info)
-│   ├── slash_commands.py     # Slash 指令 (userinfo)
-│   ├── embeds.py             # Embed 訊息指令
-│   ├── auto_voice.py         # 公開自動語音頻道
-│   ├── private_room.py       # 私人包廂 & 密碼系統
-│   ├── room_registry.py      # 語音房共享狀態管理
-│   ├── skill_commands.py     # 湯技角色系統
-│   ├── leveling.py           # 活躍值等級系統
-│   └── leveling_db.py        # 等級資料庫層 (SQLite)
+│   ├── prefix/               # 前綴指令模組
+│   │   └── general.py        # 基本指令 (ping, info)
+│   ├── slash/                # 其他 Slash 指令模組
+│   │   ├── slash_commands.py # Slash 指令 (userinfo)
+│   │   ├── embeds.py         # Embed 訊息指令
+│   │   ├── auto_voice.py     # 公開自動語音頻道
+│   │   ├── private_room.py   # 私人包廂 & 密碼系統
+│   │   └── leveling.py       # 活躍值等級系統
+│   ├── service/              # 共用服務層
+│   │   └── room_registry.py  # 語音房共享狀態管理
+│   ├── repository/           # 共用資料層
+│   │   └── leveling_db.py    # 等級資料庫層 (SQLite)
+│   ├── skills/               # 湯技三層架構
+│   │   ├── slash/            # 表現層：Slash 指令
+│   │   │   └── skill_commands.py
+│   │   ├── repository/       # 資料層：邀請碼儲存
+│   │   │   └── skill_invite_repository.py
+│   │   └── service/          # 業務層：湯技規則與流程
+│   │       └── skill_service.py
 ├── data/                     # 資料目錄（等級資料庫）
 ├── Dockerfile                # Docker 映像定義
 ├── docker-compose.yml        # Docker Compose 設定
@@ -145,26 +155,26 @@ discord-channel-bot/
 
 ## 📋 指令一覽
 
-### 基本指令（general.py）
+### 基本指令（prefix/general.py）
 
 | 指令 | 說明 |
 |---|---|
 | `!ping` | 查看機器人延遲 |
 | `!info` | 顯示機器人資訊 |
 
-### Slash 指令（slash_commands.py）
+### Slash 指令（slash/slash_commands.py）
 
 | 指令 | 說明 |
 |---|---|
 | `/userinfo [使用者]` | 查詢使用者資訊 |
 
-### Embed 訊息（embeds.py）
+### Embed 訊息（slash/embeds.py）
 
 | 指令 | 權限需求 | 說明 |
 |---|---|---|
 | `/announce <標題> <內容>` | 管理訊息 | 發送格式化的嵌入式公告 |
 
-### 自動語音頻道（auto_voice.py）
+### 自動語音頻道（slash/auto_voice.py）
 
 | 指令 | 權限需求 | 說明 |
 |---|---|---|
@@ -173,26 +183,27 @@ discord-channel-bot/
 | `/voice-kick <使用者>` | 房主 | 將使用者踢出語音房 |
 | `/setup-voice` | 管理頻道 | 在所有分類中新增語音觸發頻道 |
 
-### 私人包廂（private_room.py）
+### 私人包廂（slash/private_room.py）
 
 | 指令 | 權限需求 | 說明 |
 |---|---|---|
 | `/voice-invite <使用者>` | 房主 | 邀請使用者加入私人語音房 |
 | `/setup-private` | 管理頻道 | 建立私人包廂分類與密碼輸入頻道 |
 
-### 湯技角色系統（skill_commands.py）
+### 湯技角色系統（skills/slash/skill_commands.py）
 
 | 指令 | 權限需求 | 說明 |
 |---|---|---|
-| `/skill create <名稱> [emoji]` | 管理角色 | 建立湯技（自動生成角色、分類、頻道、語音觸發） |
+| `/skill create <名稱> [emoji]` | 管理角色 | 建立湯技（自動生成角色、分類、頻道、語音觸發，並產生邀請碼） |
 | `/skill delete <名稱>` | 管理角色 | 刪除湯技及所有相關資源 |
-| `/skill join <名稱>` | — | 加入指定湯技 |
+| `/skill join <邀請碼>` | — | 使用邀請碼加入湯技 |
 | `/skill leave <名稱>` | — | 離開指定湯技 |
+| `/skill regen <名稱>` | 管理角色 | 重新產生該湯技邀請碼 |
 | `/skill list` | — | 列出所有湯技及成員數量 |
 | `/skill setup` | 管理角色 | 修復現有湯技的缺失頻道 |
-| `/skill panel` | 管理角色 | 發送互動按鈕面板，讓成員一鍵加入/離開湯技 |
+| `/skill panel` | 管理角色 | 發送互動按鈕面板（顯示湯技並可一鍵離開；加入需邀請碼） |
 
-### 活躍值等級系統（leveling.py）
+### 活躍值等級系統（slash/leveling.py）
 
 | 指令 | 權限需求 | 說明 |
 |---|---|---|
@@ -280,6 +291,7 @@ discord-channel-bot/
 - 📂 專屬分類
 - 💬 文字頻道
 - 🔊 語音觸發頻道
+- 🔐 一組管理員可發放的湯技邀請碼
 
 ### 步驟五：發送湯技面板
 
@@ -288,6 +300,7 @@ discord-channel-bot/
 ```
 
 在適當的頻道中執行此指令，機器人會發送一個帶有按鈕的互動面板，讓成員可以一鍵加入或離開湯技。
+加入湯技改為邀請碼機制，成員請改用 `/skill join <邀請碼>`；按鈕面板可快速離開既有湯技。
 
 ### 步驟六：初始化等級系統
 

@@ -18,13 +18,13 @@ intents.members = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 COGS = [
-    "cogs.general",
-    "cogs.embeds",
-    "cogs.slash_commands",
-    "cogs.auto_voice",
-    "cogs.private_room",
-    "cogs.skill_commands",
-    "cogs.leveling",
+    "cogs.prefix.general",
+    "cogs.slash.embeds",
+    "cogs.slash.slash_commands",
+    "cogs.slash.auto_voice",
+    "cogs.slash.private_room",
+    "cogs.skills.slash.skill_commands",
+    "cogs.slash.leveling",
 ]
 
 

@@ -20,7 +20,7 @@ from config import (
     LEVELUP_CHANNEL,
     LEVEL_ROLES,
 )
-from cogs.leveling_db import LevelingDB
+from cogs.repository.leveling_db import LevelingDB
 
 
 def _progress_bar(current: int, total: int, length: int = 16) -> str:

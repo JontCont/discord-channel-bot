@@ -1,5 +1,4 @@
 import aiosqlite
-import os
 from pathlib import Path
 
 
@@ -101,7 +100,6 @@ class LevelingDB:
             today_date = datetime.strptime(today, "%Y-%m-%d").date()
             if today_date - last == timedelta(days=1):
                 streak = user["daily_streak"] + 1
-        # else streak resets to 1
 
         await self._db.execute(
             "UPDATE users SET daily_streak = ?, last_daily = ? "
