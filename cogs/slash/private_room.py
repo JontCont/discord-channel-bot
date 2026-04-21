@@ -11,6 +11,7 @@ from config import (
     PRIVATE_SUFFIX,
     PRIVATE_LIMIT,
     PASSWORD_CHANNEL,
+    LEVEL_ROLES,
 )
 
 
@@ -27,6 +28,13 @@ class PrivateRoom(commands.Cog):
     @property
     def registry(self):
         return self.bot.room_registry
+
+    def _iter_level_roles(self, guild: discord.Guild):
+        """Yield existing milestone roles configured in LEVEL_ROLES."""
+        for _, role_name, _ in LEVEL_ROLES:
+            role = discord.utils.get(guild.roles, name=role_name)
+            if role is not None:
+                yield role
 
     # ── Voice state: private trigger & cleanup ───────────────
 
@@ -54,6 +62,14 @@ class PrivateRoom(commands.Cog):
                     connect=True, view_channel=True, manage_channels=True
                 ),
             }
+
+            # Keep private rooms visible for leveling roles even if category denies them.
+            # They still cannot join until invited/password grants member-specific permission.
+            for role in self._iter_level_roles(member.guild):
+                overwrites[role] = discord.PermissionOverwrite(
+                    connect=False,
+                    view_channel=True,
+                )
 
             new_channel = await member.guild.create_voice_channel(
                 name=channel_name,
@@ -174,6 +190,11 @@ class PrivateRoom(commands.Cog):
             )
             results.append(f"#{PASSWORD_CHANNEL}")
 
+        password_channel = discord.utils.get(
+            category.text_channels,
+            name=PASSWORD_CHANNEL,
+        )
+
         has_trigger = any(
             ch.name == PRIVATE_TRIGGER for ch in category.voice_channels
         )
@@ -184,15 +205,71 @@ class PrivateRoom(commands.Cog):
             )
             results.append(PRIVATE_TRIGGER)
 
+        trigger_channel = discord.utils.get(
+            category.voice_channels,
+            name=PRIVATE_TRIGGER,
+        )
+
+        # ── Fix visibility for @everyone and all existing level roles ──────────
+        # Set explicit overwrites so category/channel-level denies don't block members.
+        reason = f"Private room setup by {interaction.user}"
+        everyone = guild.default_role
+
+        # Category: everyone can see it
+        await category.set_permissions(everyone, view_channel=True, reason=reason)
+
+        # Password channel: everyone can see and type (messages auto-deleted)
+        if password_channel is not None:
+            await password_channel.set_permissions(
+                everyone,
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                reason=reason,
+            )
+
+        # Trigger voice channel: everyone can see and enter to create a room
+        if trigger_channel is not None:
+            await trigger_channel.set_permissions(
+                everyone,
+                view_channel=True,
+                connect=True,
+                reason=reason,
+            )
+
+        # Also apply to any existing level roles (redundant but explicit)
+        role_updates = 0
+        for role in self._iter_level_roles(guild):
+            await category.set_permissions(role, view_channel=True, reason=reason)
+            role_updates += 1
+            if password_channel is not None:
+                await password_channel.set_permissions(
+                    role,
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    reason=reason,
+                )
+            if trigger_channel is not None:
+                await trigger_channel.set_permissions(
+                    role, view_channel=True, connect=True, reason=reason
+                )
+
+        sync_note = f"🔧 已修正 @everyone 可見性權限。"
+        if role_updates:
+            sync_note += f"（另同步 {role_updates} 個等級角色）"
+
         if results:
-            await interaction.followup.send(
+            msg = (
                 f"✅ 已在「{PRIVATE_CATEGORY}」建立：\n"
                 + "\n".join(f"　• {r}" for r in results)
+                + f"\n\n{sync_note}"
             )
+            await interaction.followup.send(msg)
             await self._post_password_rules(guild)
         else:
             await interaction.followup.send(
-                f"⏭️ 「{PRIVATE_CATEGORY}」分類和所有頻道已存在。"
+                f"⏭️ 「{PRIVATE_CATEGORY}」分類和所有頻道已存在。\n{sync_note}"
             )
 
     def _build_password_rules_embed(self) -> discord.Embed:
