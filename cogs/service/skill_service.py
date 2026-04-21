@@ -106,7 +106,7 @@ class SkillService:
 
         return {
             guild.default_role: discord.PermissionOverwrite(
-                view_channel=True,
+                view_channel=False,
                 send_messages=False,
                 connect=False,
             ),
