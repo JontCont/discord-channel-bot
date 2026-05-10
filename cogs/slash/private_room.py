@@ -51,15 +51,26 @@ class PrivateRoom(commands.Cog):
             password = _generate_password()
             channel_name = f"🔒 {member.display_name}{PRIVATE_SUFFIX}"
 
+            # Lock the room by default, then explicitly grant the owner and bot access.
             overwrites = {
                 member.guild.default_role: discord.PermissionOverwrite(
                     connect=False, view_channel=True
                 ),
+                # The room owner can enter, speak, and manage their own private room.
                 member: discord.PermissionOverwrite(
-                    connect=True, view_channel=True, manage_channels=True
+                    connect=True,
+                    view_channel=True,
+                    speak=True,
+                    use_voice_activation=True,
+                    manage_channels=True,
                 ),
+                # The bot keeps management access so it can continue handling invites/cleanup.
                 member.guild.me: discord.PermissionOverwrite(
-                    connect=True, view_channel=True, manage_channels=True
+                    connect=True,
+                    view_channel=True,
+                    speak=True,
+                    use_voice_activation=True,
+                    manage_channels=True,
                 ),
             }
 
@@ -119,7 +130,11 @@ class PrivateRoom(commands.Cog):
             voice_channel = message.guild.get_channel(channel_id)
             if voice_channel:
                 await voice_channel.set_permissions(
-                    message.author, connect=True, view_channel=True
+                    message.author,
+                    connect=True,
+                    view_channel=True,
+                    speak=True,
+                    use_voice_activation=True,
                 )
                 confirm = await message.channel.send(
                     f"✅ {message.author.mention} 密碼正確！你現在可以加入 **{voice_channel.name}** 了。",
@@ -154,7 +169,13 @@ class PrivateRoom(commands.Cog):
             )
             return
 
-        await channel.set_permissions(member, connect=True, view_channel=True)
+        await channel.set_permissions(
+            member,
+            connect=True,
+            view_channel=True,
+            speak=True,
+            use_voice_activation=True,
+        )
         await interaction.response.send_message(
             f"✅ 已邀請 {member.mention} 進入包廂。", ephemeral=True
         )
