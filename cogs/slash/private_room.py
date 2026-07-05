@@ -352,6 +352,107 @@ class PrivateRoom(commands.Cog):
         for guild in self.bot.guilds:
             await self._post_password_rules(guild)
 
+    # ── /fix-private-perms ──────────────────────────────────
+    
+    @app_commands.command(
+        name="fix-private-perms",
+        description="修復所有現有私人包廂的權限（給予房主完整管理權）",
+    )
+    @app_commands.checks.has_permissions(manage_channels=True)
+    async def fix_private_perms(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        
+        category = discord.utils.get(guild.categories, name=PRIVATE_CATEGORY)
+        if not category:
+            await interaction.followup.send(
+                f"❌ 找不到「{PRIVATE_CATEGORY}」分類。請先執行 /setup-private。"
+            )
+            return
+        
+        fixed_count = 0
+        error_count = 0
+        fixed_channels = []
+        
+        for channel in category.voice_channels:
+            # Skip trigger channel
+            if channel.name == PRIVATE_TRIGGER:
+                continue
+            
+            # Check if this is a private room (has lock emoji or is in registry)
+            if not channel.name.startswith("🔒"):
+                continue
+            
+            try:
+                # Get room info from registry
+                info = self.registry.get(channel.id)
+                if info and info.get("owner_id"):
+                    owner = guild.get_member(info["owner_id"])
+                    if owner:
+                        # Grant full permissions to owner
+                        await channel.set_permissions(
+                            owner,
+                            connect=True,
+                            view_channel=True,
+                            speak=True,
+                            use_voice_activation=True,
+                            manage_channels=True,
+                            reason=f"Fix private room permissions by {interaction.user}",
+                        )
+                        
+                        # Ensure bot has permissions
+                        await channel.set_permissions(
+                            guild.me,
+                            connect=True,
+                            view_channel=True,
+                            speak=True,
+                            use_voice_activation=True,
+                            manage_channels=True,
+                            reason=f"Fix private room permissions by {interaction.user}",
+                        )
+                        
+                        # Ensure @everyone cannot connect but can view
+                        await channel.set_permissions(
+                            guild.default_role,
+                            connect=False,
+                            view_channel=True,
+                            reason=f"Fix private room permissions by {interaction.user}",
+                        )
+                        
+                        fixed_channels.append(f"🔒 {channel.name}")
+                        fixed_count += 1
+            except Exception as e:
+                error_count += 1
+                print(f"Error fixing permissions for {channel.name}: {e}")
+        
+        if fixed_count > 0:
+            msg = f"✅ 已修復 {fixed_count} 個私人包廂的權限：\n"
+            for ch_name in fixed_channels[:10]:  # Show first 10
+                msg += f"　• {ch_name}\n"
+            if len(fixed_channels) > 10:
+                msg += f"　... 以及其他 {len(fixed_channels) - 10} 個頻道\n"
+            if error_count > 0:
+                msg += f"\n⚠️ {error_count} 個頻道修復失敗"
+            await interaction.followup.send(msg)
+        else:
+            await interaction.followup.send(
+                "ℹ️ 沒有找到需要修復的私人包廂，或所有包廂權限已正確設定。"
+            )
+    
+    @fix_private_perms.error
+    async def fix_perms_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ):
+        if isinstance(error, app_commands.MissingPermissions):
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    "🚫 你需要「管理頻道」權限才能使用此指令。", ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(
+                    "🚫 你需要「管理頻道」權限才能使用此指令。", ephemeral=True
+                )
+
     @setup_private.error
     async def setup_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
