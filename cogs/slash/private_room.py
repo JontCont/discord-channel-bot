@@ -151,9 +151,9 @@ class PrivateRoom(commands.Cog):
 
     @app_commands.command(
         name="voice-invite",
-        description="邀請成員進入你的私人包廂",
+        description="邀請指定成員進入你目前所屬的私人語音包廂（僅房主可用）",
     )
-    @app_commands.describe(member="要邀請的成員")
+    @app_commands.describe(member="要直接邀請進入包廂的成員")
     async def voice_invite(
         self, interaction: discord.Interaction, member: discord.Member
     ):
@@ -184,7 +184,7 @@ class PrivateRoom(commands.Cog):
 
     @app_commands.command(
         name="setup-private",
-        description="建立私人包廂分類與觸發頻道",
+        description="建立私人包廂分類、密碼驗證頻道與包廂觸發語音頻道（需管理頻道權限）",
     )
     @app_commands.checks.has_permissions(manage_channels=True)
     async def setup_private(self, interaction: discord.Interaction):
@@ -356,7 +356,7 @@ class PrivateRoom(commands.Cog):
     
     @app_commands.command(
         name="fix-private-perms",
-        description="修復所有現有私人包廂的權限（給予房主完整管理權）",
+        description="修復所有現有私人包廂的權限（確保房主完整管理權與隔離設定，需管理頻道權限）",
     )
     @app_commands.checks.has_permissions(manage_channels=True)
     async def fix_private_perms(self, interaction: discord.Interaction):

@@ -53,9 +53,9 @@ class AutoVoice(commands.Cog):
 
     @app_commands.command(
         name="voice-name",
-        description="重新命名你目前的自動語音頻道",
+        description="重新命名你目前所擁有的動態語音頻道（僅房主可用）",
     )
-    @app_commands.describe(name="新的頻道名稱")
+    @app_commands.describe(name="新的語音頻道名稱")
     async def voice_name(self, interaction: discord.Interaction, name: str):
         channel, err = self.registry.get_owned_channel(interaction)
         if err:
@@ -71,9 +71,9 @@ class AutoVoice(commands.Cog):
 
     @app_commands.command(
         name="voice-limit",
-        description="設定你的語音頻道人數上限",
+        description="設定你的動態語音頻道人數上限（僅房主可用）",
     )
-    @app_commands.describe(limit="人數上限（0 = 無限制）")
+    @app_commands.describe(limit="人數上限（0 為無限制，最大 99）")
     async def voice_limit(self, interaction: discord.Interaction, limit: int):
         channel, err = self.registry.get_owned_channel(interaction)
         if err:
@@ -90,7 +90,7 @@ class AutoVoice(commands.Cog):
 
     @app_commands.command(
         name="voice-kick",
-        description="將成員踢出你的語音頻道",
+        description="將指定成員踢出你的動態語音頻道（僅房主可用）",
     )
     @app_commands.describe(member="要踢出的成員")
     async def voice_kick(
@@ -121,7 +121,7 @@ class AutoVoice(commands.Cog):
 
     @app_commands.command(
         name="setup-voice",
-        description="在所有分類下建立自動語音觸發頻道",
+        description="在伺服器各分類下批次建立自動語音觸發頻道（需管理頻道權限）",
     )
     @app_commands.checks.has_permissions(manage_channels=True)
     async def setup_voice(self, interaction: discord.Interaction):

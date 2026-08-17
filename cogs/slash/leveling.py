@@ -189,7 +189,10 @@ class Leveling(commands.Cog):
 
     # ── /daily ───────────────────────────────────────────────
 
-    @app_commands.command(name="daily", description="每日簽到領取活躍值")
+    @app_commands.command(
+        name="daily",
+        description="每日簽到領取活躍值 XP（累積連續天數享倍率加成）",
+    )
     async def daily(self, interaction: discord.Interaction):
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         result = await self.db.do_daily(interaction.user.id, interaction.guild.id, today)
@@ -234,8 +237,11 @@ class Leveling(commands.Cog):
 
     # ── /rank ────────────────────────────────────────────────
 
-    @app_commands.command(name="rank", description="查看你的等級與活躍值")
-    @app_commands.describe(member="要查看的成員（留空查自己）")
+    @app_commands.command(
+        name="rank",
+        description="查看個人或指定成員的等級、稱號、排名與升級進度",
+    )
+    @app_commands.describe(member="要查看的成員（留空則查詢自己）")
     async def rank(
         self,
         interaction: discord.Interaction,
@@ -275,7 +281,10 @@ class Leveling(commands.Cog):
 
     # ── /leaderboard ─────────────────────────────────────────
 
-    @app_commands.command(name="leaderboard", description="查看活躍值排行榜")
+    @app_commands.command(
+        name="leaderboard",
+        description="查看伺服器活躍值排行榜 TOP 10",
+    )
     async def leaderboard(self, interaction: discord.Interaction):
         top = await self.db.get_leaderboard(interaction.guild.id, limit=10)
         if not top:
@@ -305,7 +314,7 @@ class Leveling(commands.Cog):
 
     @app_commands.command(
         name="level-preview",
-        description="預覽升級公告、等級卡、排行榜的顯示效果",
+        description="預覽升級公告、等級卡與排行榜的顯示效果（需管理角色權限）",
     )
     @app_commands.checks.has_permissions(manage_roles=True)
     async def level_preview(self, interaction: discord.Interaction):
@@ -386,7 +395,7 @@ class Leveling(commands.Cog):
 
     @app_commands.command(
         name="level-init",
-        description="為所有現有成員初始化等級資料並分配 LV1 身分組",
+        description="為伺服器所有現有成員初始化等級資料並分配 LV1 身分組（需管理角色權限）",
     )
     @app_commands.checks.has_permissions(manage_roles=True)
     async def level_init(self, interaction: discord.Interaction):

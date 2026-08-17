@@ -88,7 +88,7 @@ class SkillPanelView(discord.ui.View):
 
 
 class SkillCommands(commands.GroupCog, name="skill"):
-    """湯技管理模組 — 建立/刪除/加入/離開湯技角色與頻道"""
+    """湯技管理模組 — 建立/刪除/加入/離開湯技身分組與專屬頻道（論壇、聊天、語音）"""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -199,8 +199,14 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill create ────────────────────────────────────────
 
-    @app_commands.command(name="create", description="建立新的湯技角色")
-    @app_commands.describe(name="湯技名稱", emoji="湯技 emoji（選填）")
+    @app_commands.command(
+        name="create",
+        description="建立新湯技（包含專屬身分組、分類、論壇/聊天/語音頻道及邀請碼）",
+    )
+    @app_commands.describe(
+        name="湯技名稱（例如：遊戲術、墨繪術）",
+        emoji="湯技專屬 emoji 圖示（選填）",
+    )
     @app_commands.checks.has_permissions(manage_roles=True)
     async def skill_create(
         self,
@@ -273,8 +279,11 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill delete ────────────────────────────────────────
 
-    @app_commands.command(name="delete", description="刪除湯技角色及其頻道")
-    @app_commands.describe(name="湯技名稱")
+    @app_commands.command(
+        name="delete",
+        description="刪除指定湯技（包含身分組、分類、所有相關頻道與邀請碼）",
+    )
+    @app_commands.describe(name="要刪除的湯技名稱")
     @app_commands.checks.has_permissions(manage_roles=True)
     @app_commands.autocomplete(name=_skill_autocomplete)
     async def skill_delete(self, interaction: discord.Interaction, name: str):
@@ -303,8 +312,11 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill join ──────────────────────────────────────────
 
-    @app_commands.command(name="join", description="使用邀請碼加入湯技角色")
-    @app_commands.describe(code="湯技邀請碼")
+    @app_commands.command(
+        name="join",
+        description="輸入邀請碼加入指定湯技身分組與專屬頻道",
+    )
+    @app_commands.describe(code="湯技 8 碼專屬邀請碼")
     async def skill_join(self, interaction: discord.Interaction, code: str):
         guild = interaction.guild
         matched = self.skill_service.find_skill_by_code(guild, code)
@@ -330,8 +342,14 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill info ──────────────────────────────────────────
 
-    @app_commands.command(name="info", description="查看湯技詳情（可選擇重新產生邀請碼）")
-    @app_commands.describe(name="湯技名稱", regenerate_invite="是否重新產生邀請碼")
+    @app_commands.command(
+        name="info",
+        description="查看湯技詳細資訊（邀請碼、身分組、分類）並可選擇重新產生邀請碼",
+    )
+    @app_commands.describe(
+        name="湯技名稱",
+        regenerate_invite="是否立即重新產生並更換邀請碼（預設 False）",
+    )
     @app_commands.checks.has_permissions(manage_roles=True)
     @app_commands.autocomplete(name=_skill_autocomplete)
     async def skill_info(
@@ -372,7 +390,10 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill regen ────────────────────────────────────────
 
-    @app_commands.command(name="regen", description="重新產生湯技邀請碼")
+    @app_commands.command(
+        name="regen",
+        description="為指定湯技重新產生新的邀請碼（舊邀請碼將立即作廢）",
+    )
     @app_commands.describe(name="湯技名稱")
     @app_commands.checks.has_permissions(manage_roles=True)
     @app_commands.autocomplete(name=_skill_autocomplete)
@@ -392,8 +413,11 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill leave ─────────────────────────────────────────
 
-    @app_commands.command(name="leave", description="離開湯技角色")
-    @app_commands.describe(name="湯技名稱")
+    @app_commands.command(
+        name="leave",
+        description="離開指定湯技身分組並移除專屬頻道存取權",
+    )
+    @app_commands.describe(name="要離開的湯技名稱")
     @app_commands.autocomplete(name=_skill_autocomplete)
     async def skill_leave(self, interaction: discord.Interaction, name: str):
         guild = interaction.guild
@@ -418,7 +442,10 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill list ──────────────────────────────────────────
 
-    @app_commands.command(name="list", description="列出所有湯技角色")
+    @app_commands.command(
+        name="list",
+        description="列出伺服器中所有的湯技身分組與目前成員人數",
+    )
     async def skill_list(self, interaction: discord.Interaction):
         guild = interaction.guild
         skills = []
@@ -442,7 +469,10 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill setup ─────────────────────────────────────────
 
-    @app_commands.command(name="setup", description="為既有的湯技角色補建分類和頻道")
+    @app_commands.command(
+        name="setup",
+        description="檢查既有湯技並自動補齊缺失的頻道（論壇/聊天/語音觸發）與同步身分組權限",
+    )
     @app_commands.checks.has_permissions(manage_roles=True)
     async def skill_setup(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -517,7 +547,10 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
     # ── /skill panel ─────────────────────────────────────────
 
-    @app_commands.command(name="panel", description="發送湯技選擇面板（依環境變數套用可直接加入）")
+    @app_commands.command(
+        name="panel",
+        description="在當前頻道發送湯技互動選單面板（可點擊按鈕加入或離開湯技）",
+    )
     @app_commands.checks.has_permissions(manage_roles=True)
     async def skill_panel(self, interaction: discord.Interaction):
         guild = interaction.guild

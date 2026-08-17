@@ -15,7 +15,11 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
+bot = commands.Bot(
+    command_prefix=BOT_PREFIX,
+    intents=intents,
+    help_command=None,
+)
 
 COGS = [
     "cogs.prefix.general",
@@ -25,6 +29,7 @@ COGS = [
     "cogs.slash.private_room",
     "cogs.slash.skill_commands",
     "cogs.slash.leveling",
+    "cogs.slash.help",
 ]
 
 

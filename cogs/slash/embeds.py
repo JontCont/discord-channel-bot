@@ -9,8 +9,11 @@ class Embeds(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="announce", description="發送公告 Embed 訊息")
-    @app_commands.describe(title="公告標題", content="公告內容")
+    @app_commands.command(
+        name="announce",
+        description="在當前頻道發送格式化的嵌入式 (Embed) 公告訊息（需管理訊息權限）",
+    )
+    @app_commands.describe(title="公告標題", content="公告內文訊息")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def announce(
         self,

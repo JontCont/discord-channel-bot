@@ -9,8 +9,11 @@ class SlashCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="userinfo", description="查看使用者資訊")
-    @app_commands.describe(member="要查看的使用者")
+    @app_commands.command(
+        name="userinfo",
+        description="查看指定成員或自己的詳細帳號與伺服器資訊",
+    )
+    @app_commands.describe(member="要查看的伺服器成員（留空則查詢自己）")
     async def userinfo(
         self,
         interaction: discord.Interaction,
