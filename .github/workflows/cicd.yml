@@ -1,0 +1,251 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1538768152886911046/R9ZHoZ49qUSmLLnvn7fl2wmSQmRKp2Fnz2iLsP2y6BUqFb6ApIFr7WOmHGNq5eigpjJs' }}
+
+jobs:
+  # ── 1. CI: 語法檢查與依賴驗證 ───────────────────────────
+  ci:
+    name: 🧪 CI Code Quality & Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔍 Compile & Check Python Syntax
+        run: |
+          python -m py_compile bot.py config.py
+          python -m py_compile cogs/prefix/*.py
+          python -m py_compile cogs/slash/*.py
+          python -m py_compile cogs/repository/*.py
+          python -m py_compile cogs/service/*.py
+          echo "✅ All Python files passed compilation checks!"
+
+  # ── 2. CD: 構建並推送 Docker Image ──────────────────────
+  build-and-push:
+    name: 🐳 CD Build & Push Docker Image
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tags: ${{ steps.meta.outputs.tags }}
+      image_version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Set up QEMU (Multi-platform support)
+        uses: docker/setup-qemu-action@v3
+
+      - name: 🛠️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔑 Log in to GitHub Container Registry (GHCR)
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Extract Docker Metadata (Tags & Labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,prefix=
+            type=ref,event=tag
+            type=ref,event=branch
+
+      - name: 🚀 Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 3. Notify: Discord Webhook 通知 ──────────────────────
+  notify:
+    name: 📢 Discord Webhook Notification
+    needs: [ci, build-and-push]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📤 Send Discord Notification
+        env:
+          DISCORD_WEBHOOK: ${{ env.DISCORD_WEBHOOK }}
+          CI_STATUS: ${{ needs.ci.result }}
+          CD_STATUS: ${{ needs.build-and-push.result }}
+          IMAGE_TAGS: ${{ needs.build-and-push.outputs.image_tags }}
+          COMMITS_DATA: ${{ toJson(github.event.commits) }}
+          HEAD_COMMIT_DATA: ${{ toJson(github.event.head_commit) }}
+          AUTHOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          SERVER_URL: ${{ github.server_url }}
+          RUN_ID: ${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 - << 'EOF'
+          import os
+          import json
+          import urllib.request
+          from datetime import datetime, timezone
+
+          webhook_url = os.environ.get("DISCORD_WEBHOOK")
+          if not webhook_url:
+              print("⚠️ No Discord webhook URL configured, skipping notification.")
+              exit(0)
+
+          ci_status = os.environ.get("CI_STATUS")
+          cd_status = os.environ.get("CD_STATUS")
+          image_tags_raw = os.environ.get("IMAGE_TAGS", "")
+          commits_raw = os.environ.get("COMMITS_DATA")
+          head_commit_raw = os.environ.get("HEAD_COMMIT_DATA")
+          author = os.environ.get("AUTHOR", "")
+          repo = os.environ.get("REPO", "")
+          ref = os.environ.get("REF", "")
+          sha = os.environ.get("SHA", "")
+          short_sha = sha[:7] if sha else "N/A"
+          server_url = os.environ.get("SERVER_URL", "https://github.com")
+          run_id = os.environ.get("RUN_ID", "")
+          event_name = os.environ.get("EVENT_NAME", "")
+
+          repo_url = f"{server_url}/{repo}"
+          commit_url = f"{server_url}/{repo}/commit/{sha}"
+          run_url = f"{server_url}/{repo}/actions/runs/{run_id}"
+
+          if ci_status == "success" and cd_status == "success":
+              color = 5763719  # Green
+              title = "🚀 CI/CD Pipeline 執行成功！"
+              desc = "程式碼語法檢查通過，Docker Image 已成功構建並推送至 GitHub Container Registry (GHCR)。"
+          elif ci_status == "success" and cd_status == "skipped":
+              color = 3447003  # Blue
+              title = f"ℹ️ {event_name.upper()} CI 檢查通過"
+              desc = "Pull Request 語法檢查與依賴驗證通過（未推送 Docker Image）。"
+          else:
+              color = 15548997  # Red
+              title = "❌ CI/CD Pipeline 執行失敗"
+              desc = "Pipeline 執行過程中發生錯誤，請點擊下方記錄查看詳細日誌以進行除錯。"
+
+          # 解析 Commits 內容
+          commits_list = []
+          if commits_raw and commits_raw != "null":
+              try:
+                  data = json.loads(commits_raw)
+                  if isinstance(data, list):
+                      commits_list = data
+              except Exception:
+                  pass
+
+          if not commits_list and head_commit_raw and head_commit_raw != "null":
+              try:
+                  head_data = json.loads(head_commit_raw)
+                  if isinstance(head_data, dict) and head_data:
+                      commits_list = [head_data]
+              except Exception:
+                  pass
+
+          commit_blocks = []
+          for c in commits_list:
+              c_id = c.get("id", "") or sha
+              c_short = c_id[:7] if c_id else "N/A"
+              c_url = c.get("url") or f"{server_url}/{repo}/commit/{c_id}"
+              c_author = (c.get("author") or {}).get("name") or author
+              raw_msg = (c.get("message") or "").strip()
+              msg_lines = raw_msg.splitlines()
+              title_line = msg_lines[0] if msg_lines else "無提交訊息"
+              body_lines = [l for l in msg_lines[1:] if l.strip()]
+
+              entry = f"• [`{c_short}`]({c_url}) **{title_line}** (`@{c_author}`)"
+              if body_lines:
+                  formatted_body = "\n".join(f"  > {l}" for l in body_lines[:6])
+                  if len(body_lines) > 6:
+                      formatted_body += f"\n  > ...（其餘 {len(body_lines) - 6} 行省略）"
+                  entry += f"\n{formatted_body}"
+              commit_blocks.append(entry)
+
+          if commit_blocks:
+              commits_text = "\n\n".join(commit_blocks)
+          else:
+              commits_text = f"• [`{short_sha}`]({commit_url}) 手動觸發或無 Commit 變更 (`@{author}`)"
+
+          if len(commits_text) > 1020:
+              commits_text = commits_text[:1015] + "..."
+
+          # 解析 Docker Images
+          if image_tags_raw and cd_status == "success":
+              image_lines = "\n".join(f"`{t.strip()}`" for t in image_tags_raw.split() if t.strip())
+          else:
+              image_lines = "無（未推送或執行失敗）"
+
+          payload = {
+              "username": "GitHub Actions CI/CD",
+              "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              "embeds": [
+                  {
+                      "title": title,
+                      "description": desc,
+                      "color": color,
+                      "fields": [
+                          {"name": "📦 儲存庫", "value": f"[{repo}]({repo_url})", "inline": True},
+                          {"name": "🌿 分支 / 標籤", "value": f"`{ref}`", "inline": True},
+                          {"name": "👤 觸發者", "value": author, "inline": True},
+                          {"name": "📝 更新 Commit 內容", "value": commits_text, "inline": False},
+                          {"name": "🐳 Docker Images (GHCR)", "value": image_lines, "inline": False},
+                          {"name": "🔗 執行記錄", "value": f"[查看完整 Actions Run 日誌]({run_url})", "inline": False},
+                      ],
+                      "footer": {
+                          "text": "Discord Channel Bot CI/CD Pipeline",
+                          "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                      },
+                      "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                  }
+              ],
+          }
+
+          req = urllib.request.Request(
+              webhook_url,
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json", "User-Agent": "GitHub-Actions-CI-CD"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  print(f"✅ Discord notification sent successfully (status: {resp.status})")
+          except Exception as e:
+              print(f"⚠️ Failed to send Discord notification: {e}")
+          EOF
