@@ -66,12 +66,12 @@ class SkillService:
         embed = discord.Embed(
             title="🎯 選擇你的湯技",
             description=(
-                "加入：請使用 `/skill join` + 邀請碼\n"
-                "離開：可直接點下方按鈕\n\n" + "\n".join(lines)
+                "點擊下方按鈕即可快速加入或離開對應的湯技！\n\n"
+                + "\n".join(lines)
             ),
             color=discord.Color.blue(),
         )
-        embed.set_footer(text="加入需邀請碼；按鈕可快速離開已加入湯技")
+        embed.set_footer(text="💡 點擊按鈕即可直接加入 / 離開湯技身分組")
         return embed
 
     @staticmethod

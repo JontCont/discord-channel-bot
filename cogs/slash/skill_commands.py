@@ -5,7 +5,6 @@ from discord.ext import commands
 from config import (
     AUTO_VOICE_TRIGGER,
     SKILL_PANEL_CHANNEL,
-    SKILL_PANEL_DIRECT_JOIN_SKILLS,
     SKILL_PREFIX,
 )
 from cogs.repository.skill_invite_repository import SkillInviteRepository
@@ -20,7 +19,6 @@ class SkillToggleButton(discord.ui.Button):
         service: SkillService,
         skill_name: str,
         emoji: str | None = None,
-        allow_direct_join: bool = False,
     ):
         super().__init__(
             label=skill_name,
@@ -31,7 +29,6 @@ class SkillToggleButton(discord.ui.Button):
         self._service = service
         self.skill_name = skill_name
         self._emoji_str = emoji
-        self._allow_direct_join = allow_direct_join
 
     async def callback(self, interaction: discord.Interaction):
         role = self._service.find_role(
@@ -45,23 +42,20 @@ class SkillToggleButton(discord.ui.Button):
             )
             return
 
-        if role in interaction.user.roles:
-            await interaction.user.remove_roles(role, reason="Skill panel toggle")
+        try:
+            if role in interaction.user.roles:
+                await interaction.user.remove_roles(role, reason="Skill panel toggle")
+                await interaction.response.send_message(
+                    f"👋 你已離開湯技 **{self.skill_name}**", ephemeral=True
+                )
+            else:
+                await interaction.user.add_roles(role, reason="Skill panel toggle")
+                await interaction.response.send_message(
+                    f"✅ 你已加入湯技 **{self.skill_name}**", ephemeral=True
+                )
+        except discord.Forbidden:
             await interaction.response.send_message(
-                f"👋 你已離開湯技 **{self.skill_name}**", ephemeral=True
-            )
-        elif self._allow_direct_join:
-            await interaction.user.add_roles(role, reason="Skill panel direct join")
-            await interaction.response.send_message(
-                f"✅ 你已加入湯技 **{self.skill_name}**", ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                (
-                    f"🔐 **{self.skill_name}** 現在採邀請碼加入。\n"
-                    "請使用 `/skill join` 並輸入邀請碼。"
-                ),
-                ephemeral=True,
+                "❌ 機器人權限不足或身分組順位過低，無法調整該身分組。", ephemeral=True
             )
 
 
@@ -72,17 +66,14 @@ class SkillPanelView(discord.ui.View):
         self,
         service: SkillService,
         skills: list[tuple[str, str | None]],
-        direct_join_skills: set[str] | None = None,
     ):
         super().__init__(timeout=None)
-        direct_join_skills = direct_join_skills or set()
         for skill_name, emoji in skills:
             self.add_item(
                 SkillToggleButton(
                     service,
                     skill_name,
                     emoji,
-                    allow_direct_join=skill_name in direct_join_skills,
                 )
             )
 
@@ -562,50 +553,8 @@ class SkillCommands(commands.GroupCog, name="skill"):
             )
             return
 
-        skill_lookup = {name: emoji for name, emoji in skills}
-        configured_direct_join = [
-            name for name in SKILL_PANEL_DIRECT_JOIN_SKILLS if name in skill_lookup
-        ]
-        panel_skills = [(name, skill_lookup[name]) for name in configured_direct_join]
-        requested_direct_join = set(configured_direct_join)
-        if not panel_skills:
-            await interaction.response.send_message(
-                "❌ `SKILL_PANEL_DIRECT_JOIN_SKILLS` 沒有對應到任何現有湯技，請先確認 .env 設定。",
-                ephemeral=True,
-            )
-            return
-
-        direct_join_hint = (
-            "可直接按鈕加入："
-            + "、".join(f"**{name}**" for name in configured_direct_join)
-            if requested_direct_join
-            else "加入請使用 `/skill join` + 邀請碼；按鈕可快速離開。"
-        )
-
-        embed = discord.Embed(
-            title="🎯 選擇你的湯技",
-            description=direct_join_hint
-            + "\n\n"
-            + "\n".join(
-                f"{'　' + emoji + ' ' if emoji else '　'} **{name}**"
-                + ("（按鈕可直接加入）" if name in requested_direct_join else "")
-                for name, emoji in panel_skills
-            ),
-            color=discord.Color.blue(),
-        )
-        embed.set_footer(
-            text=(
-                "指定湯技可直接按鈕加入；其餘維持邀請碼加入。"
-                if requested_direct_join
-                else "加入需邀請碼；按鈕可快速離開已加入湯技"
-            )
-        )
-
-        view = SkillPanelView(
-            self.skill_service,
-            panel_skills,
-            direct_join_skills=requested_direct_join,
-        )
+        embed = self._build_panel_embed(skills, guild)
+        view = SkillPanelView(self.skill_service, skills)
         await interaction.channel.send(embed=embed, view=view)
         await interaction.response.send_message("✅ 湯技面板已發送！", ephemeral=True)
 
