@@ -14,7 +14,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1538768152886911046/R9ZHoZ49qUSmLLnvn7fl2wmSQmRKp2Fnz2iLsP2y6BUqFb6ApIFr7WOmHGNq5eigpjJs' }}
+  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
 jobs:
   # ── 1. CI: 語法檢查與依賴驗證 ───────────────────────────
