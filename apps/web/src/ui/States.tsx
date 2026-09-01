@@ -1,4 +1,4 @@
-import { AlertCircle, Inbox, LoaderCircle, RefreshCw } from 'lucide-react'
+import { AlertCircle, Bot, Inbox, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 
 export function LoadingState({ label = 'Loading dashboard' }: { label?: string }) {
@@ -41,6 +41,9 @@ export function EmptyState() {
         <strong>No manageable servers</strong>
         <p>Servers where you can manage the bot will appear here.</p>
       </div>
+      <a className="button primary" href="/api/bot/invite">
+        <Bot aria-hidden="true" /> Invite bot
+      </a>
     </div>
   )
 }

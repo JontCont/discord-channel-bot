@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-router'
 import { AuthenticatedLayout } from './ui/AuthenticatedLayout'
 import { GuildPicker } from './ui/GuildPicker'
+import { PrivacyPolicyPage, TermsOfServicePage } from './ui/LegalPages'
 import { LoginScreen } from './ui/LoginScreen'
 import { SettingsPage } from './ui/SettingsPage'
 import { NotFound } from './ui/States'
@@ -26,6 +27,18 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
   component: LoginScreen,
+})
+
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/privacy',
+  component: PrivacyPolicyPage,
+})
+
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/terms',
+  component: TermsOfServicePage,
 })
 
 const authenticatedRoute = createRoute({
@@ -49,6 +62,8 @@ const settingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  privacyRoute,
+  termsRoute,
   authenticatedRoute.addChildren([guildsRoute, settingsRoute]),
 ])
 

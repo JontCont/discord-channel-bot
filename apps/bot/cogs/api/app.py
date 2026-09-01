@@ -20,6 +20,23 @@ SESSION_COOKIE = "discord_bot_session"
 STATE_COOKIE = "discord_oauth_state"
 ADMINISTRATOR = 1 << 3
 MANAGE_GUILD = 1 << 5
+BOT_INVITE_PERMISSIONS = sum(
+    1 << bit
+    for bit in (
+        10,  # View channels
+        13,  # Manage channels
+        14,  # Manage roles
+        16,  # Manage webhooks
+        20,  # Manage messages
+        21,  # Embed links
+        22,  # Attach files
+        26,  # Connect
+        27,  # Speak
+        28,  # Move members
+        34,  # Manage threads
+        38,  # Send messages in threads
+    )
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,6 +314,20 @@ def create_api(
             path="/api/auth/callback",
         )
         return response
+
+    @app.get("/api/bot/invite")
+    async def invite_bot() -> RedirectResponse:
+        api_config.require_oauth()
+        query = urlencode(
+            {
+                "client_id": api_config.client_id,
+                "scope": "bot applications.commands",
+                "permissions": str(BOT_INVITE_PERMISSIONS),
+            }
+        )
+        return RedirectResponse(
+            f"{DISCORD_AUTHORIZE_URL}?{query}", status_code=status.HTTP_302_FOUND
+        )
 
     @app.get("/api/auth/callback")
     async def callback(request: Request, code: str, state: str) -> RedirectResponse:

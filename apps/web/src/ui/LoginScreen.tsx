@@ -1,4 +1,5 @@
 import { Bot, LogIn, ShieldCheck } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 
 export function LoginScreen() {
   return (
@@ -14,6 +15,11 @@ export function LoginScreen() {
           <LogIn aria-hidden="true" /> Continue with Discord
         </a>
         <p className="privacy-note"><ShieldCheck aria-hidden="true" /> Authentication stays in a secure server session.</p>
+        <nav className="login-legal" aria-label="Legal information">
+          <Link to="/privacy">Privacy Policy</Link>
+          <span aria-hidden="true">·</span>
+          <Link to="/terms">Terms of Service</Link>
+        </nav>
       </section>
     </main>
   )

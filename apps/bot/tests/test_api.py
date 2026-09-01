@@ -253,6 +253,17 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(repeated.status_code, 400)
 
+    async def test_bot_invite_redirects_to_discord_with_required_permissions(self):
+        response = await self.client.get("/api/bot/invite")
+        authorization = urlparse(response.headers["location"])
+        query = parse_qs(authorization.query)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(authorization.netloc, "discord.com")
+        self.assertEqual(query["client_id"], ["client-id"])
+        self.assertEqual(query["scope"], ["bot applications.commands"])
+        self.assertGreater(int(query["permissions"][0]), 0)
+
     async def test_logout_invalidates_session_and_clears_cookie(self):
         self.authenticate()
 

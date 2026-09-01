@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     image: discord-channel-bot:local
     container_name: discord-channel-bot
-    env_file: .env
+    env_file: ${COMPOSE_SERVICE_ENV_FILE:-.env}
     restart: unless-stopped
     expose:
       - "8000"
