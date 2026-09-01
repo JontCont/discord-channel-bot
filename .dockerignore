@@ -4,9 +4,10 @@
 .gitignore
 __pycache__/
 *.pyc
+node_modules/
+apps/web/dist/
+.nx/
 venv/
 .venv/
 docker-compose.yml
-Dockerfile
 README.md
-.dockerignore

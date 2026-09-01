@@ -2,13 +2,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import (
-    AUTO_VOICE_TRIGGER,
-    AUTO_VOICE_SUFFIX,
-    AUTO_VOICE_LIMIT,
-    PRIVATE_CATEGORY,
-)
-
 
 class AutoVoice(commands.Cog):
     """自動語音頻道模組 — 公開語音房 & 房主管理指令"""
@@ -29,15 +22,20 @@ class AutoVoice(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ):
+        settings = await self.bot.guild_settings_service.get(member.guild.id)
+
         # Public voice trigger
-        if after.channel is not None and after.channel.name == AUTO_VOICE_TRIGGER:
+        if (
+            after.channel is not None
+            and after.channel.name == settings.auto_voice_trigger
+        ):
             category = after.channel.category
-            channel_name = f"{member.display_name} 的{AUTO_VOICE_SUFFIX}"
+            channel_name = f"{member.display_name} 的{settings.auto_voice_suffix}"
 
             new_channel = await member.guild.create_voice_channel(
                 name=channel_name,
                 category=category,
-                user_limit=AUTO_VOICE_LIMIT,
+                user_limit=settings.auto_voice_limit,
                 reason=f"Auto-voice: created for {member}",
             )
             self.registry.register(new_channel.id, member.id)
@@ -128,15 +126,16 @@ class AutoVoice(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
         created = []
         skipped = []
 
         for category in guild.categories:
-            if category.name == PRIVATE_CATEGORY:
+            if category.name == settings.private_category:
                 continue
 
             exists = any(
-                ch.name == AUTO_VOICE_TRIGGER
+                ch.name == settings.auto_voice_trigger
                 for ch in category.voice_channels
             )
             if exists:
@@ -144,7 +143,7 @@ class AutoVoice(commands.Cog):
                 continue
 
             await guild.create_voice_channel(
-                name=AUTO_VOICE_TRIGGER,
+                name=settings.auto_voice_trigger,
                 category=category,
                 reason=f"Auto-voice setup by {interaction.user}",
             )

@@ -46,39 +46,44 @@
 
 ### 本機啟動
 
-```bash
-# 1. 建立虛擬環境
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS / Linux
+```powershell
+pnpm install
+Copy-Item .env.example .env
 
-# 2. 安裝套件
-pip install -r requirements.txt
+# Bot 與 OAuth/Settings API（port 8000）
+uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py
 
-# 3. 設定環境變數
-copy .env.example .env       # Windows
-# cp .env.example .env       # macOS / Linux
-# 編輯 .env 填入你的 Bot Token
+# 另一個終端啟動 Web（port 5173）
+pnpm nx run web:dev
+```
 
-# 4. 啟動機器人
-python bot.py
+本機開發時，將 `DISCORD_REDIRECT_URI` 設為
+`http://localhost:5173/api/auth/callback`。正式環境必須使用 HTTPS，並設定
+`SESSION_COOKIE_SECURE=true`。
+
+```powershell
+# 驗證
+pnpm nx run bot:test
+pnpm nx run bot:compile
+pnpm nx run web:typecheck
+pnpm nx run web:build
 ```
 
 ### Docker 啟動
 
-```bash
+```powershell
 # 1. 設定環境變數
 copy .env.example .env
 # 編輯 .env 填入你的 Bot Token
 
 # 2. 構建並啟動容器
-docker-compose up -d --build
+docker compose up -d --build
 
 # 3. 查看日誌
-docker-compose logs -f
+docker compose logs -f
 
 # 4. 停止服務
-docker-compose down
+docker compose down
 ```
 
 ---
@@ -87,29 +92,22 @@ docker-compose down
 
 ```
 discord-channel-bot/
-├── bot.py                    # 主程式入口
-├── config.py                 # 環境變數設定
-├── cogs/
-│   ├── __init__.py
-│   ├── prefix/               # 前綴指令模組
-│   │   └── general.py        # 基本指令 (ping, info)
-│   ├── slash/                # 其他 Slash 指令模組
-│   │   ├── slash_commands.py # Slash 指令 (userinfo)
-│   │   ├── embeds.py         # Embed 訊息指令
-│   │   ├── auto_voice.py     # 公開自動語音頻道
-│   │   ├── private_room.py   # 私人包廂 & 密碼系統
-│   │   ├── skill_commands.py # 湯技角色系統
-│   │   └── leveling.py       # 活躍值等級系統
-│   ├── repository/           # 共用資料層
-│   │   ├── leveling_db.py    # 等級資料庫層 (SQLite)
-│   │   └── skill_invite_repository.py # 湯技邀請碼資料層
-│   └── service/              # 共用服務層
-│       ├── room_registry.py  # 語音房共享狀態管理
-│       └── skill_service.py  # 湯技規則與流程
+├── apps/
+│   ├── bot/
+│   │   ├── bot.py            # Bot 與 API 主程式入口
+│   │   ├── config.py         # Python 環境變數設定
+│   │   ├── cogs/             # Discord、API、資料與服務模組
+│   │   ├── tests/            # Bot/API 單元測試
+│   │   ├── requirements.txt  # Python dependencies
+│   │   ├── Dockerfile
+│   │   └── project.json      # Nx bot project
+│   └── web/                  # React/Vite 設定後台
 ├── data/                     # 資料目錄（等級資料庫）
-├── Dockerfile                # Docker 映像定義
+├── logs/                     # Bot runtime logs
 ├── docker-compose.yml        # Docker Compose 設定
-├── requirements.txt
+├── nx.json                   # Nx workspace 設定
+├── package.json              # pnpm/Nx root package
+├── pnpm-workspace.yaml
 ├── .env.example
 ├── .dockerignore
 └── .gitignore
@@ -124,6 +122,14 @@ discord-channel-bot/
 | 變數名稱 | 必填 | 預設值 | 說明 |
 |---|---|---|---|
 | `DISCORD_TOKEN` | ✅ | — | 你的 Discord Bot Token |
+| `DISCORD_CLIENT_ID` | Web 必填 | — | Discord OAuth client ID |
+| `DISCORD_CLIENT_SECRET` | Web 必填 | — | Discord OAuth client secret |
+| `DISCORD_REDIRECT_URI` | Web 必填 | — | Discord OAuth callback URL |
+| `WEB_BASE_URL` | — | `/` | OAuth 完成後導回的 Web URL |
+| `SESSION_COOKIE_SECURE` | — | `false` | HTTPS 正式環境應設為 `true` |
+| `SETTINGS_DB_PATH` | — | `data/settings.db` | Guild 動態設定資料庫 |
+| `API_HOST` | — | `0.0.0.0` | Settings API listen host |
+| `API_PORT` | — | `8000` | Settings API listen port |
 | `BOT_PREFIX` | — | `!` | 前綴指令符號 |
 | `LOG_LEVEL` | — | `INFO` | 日誌等級（DEBUG / INFO / WARNING / ERROR） |
 | `BOT_LANGUAGE` | — | `zh-TW` | 語系預設（如 `zh-TW` / `en-US`）。未自訂名稱時會套用對應語言預設值 |

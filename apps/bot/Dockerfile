@@ -16,8 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
-# Change ownership of the app directory to the non-root user
-RUN chown -R botuser:botuser /app
+# Prepare writable runtime directories, then drop privileges permanently.
+RUN mkdir -p /app/data /app/logs && chown -R botuser:botuser /app
 
-# Use entrypoint to fix mounted volume permissions then drop to botuser
-ENTRYPOINT ["sh", "-c", "chown -R botuser:botuser /app/data /app/logs 2>/dev/null; exec su -s /bin/sh botuser -c 'python bot.py'"]
+USER botuser
+
+CMD ["python", "bot.py"]

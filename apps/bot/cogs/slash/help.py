@@ -2,22 +2,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import (
-    AUTO_VOICE_LIMIT,
-    AUTO_VOICE_SUFFIX,
-    AUTO_VOICE_TRIGGER,
-    BOT_PREFIX,
-    LEVELUP_CHANNEL,
-    PASSWORD_CHANNEL,
-    PRIVATE_CATEGORY,
-    PRIVATE_LIMIT,
-    PRIVATE_TRIGGER,
-    SKILL_PANEL_CHANNEL,
-    SKILL_PREFIX,
-)
+from cogs.service.guild_settings_service import GuildSettings
+from config import BOT_PREFIX
 
 
-def _get_help_embed(category: str = "overview") -> discord.Embed:
+def _get_help_embed(
+    settings: GuildSettings, category: str = "overview"
+) -> discord.Embed:
     category = (category or "overview").lower()
 
     if category in ("auto_voice", "voice", "語音"):
@@ -32,8 +23,8 @@ def _get_help_embed(category: str = "overview") -> discord.Embed:
         embed.add_field(
             name="📌 運作機制",
             value=(
-                f"• **進入觸發**：進入「`{AUTO_VOICE_TRIGGER}`」頻道即可自動建立「`使用者 的{AUTO_VOICE_SUFFIX}`」\n"
-                f"• **人數預設**：預設上限 {AUTO_VOICE_LIMIT} 人（房主可調整）\n"
+                f"• **進入觸發**：進入「`{settings.auto_voice_trigger}`」頻道即可自動建立「`使用者 的{settings.auto_voice_suffix}`」\n"
+                f"• **人數預設**：預設上限 {settings.auto_voice_limit} 人（房主可調整）\n"
                 f"• **自動刪除**：房內所有成員離開後，頻道將立即自動刪除"
             ),
             inline=False,
@@ -69,9 +60,9 @@ def _get_help_embed(category: str = "overview") -> discord.Embed:
         embed.add_field(
             name="📌 建立與加入流程",
             value=(
-                f"1️⃣ 進入「`{PRIVATE_TRIGGER}`」觸發頻道，系統自動在「`{PRIVATE_CATEGORY}`」分類下建立上鎖包廂（預設上限 {PRIVATE_LIMIT} 人）\n"
+                f"1️⃣ 進入「`{settings.private_trigger}`」觸發頻道，系統自動在「`{settings.private_category}`」分類下建立上鎖包廂（預設上限 {settings.private_limit} 人）\n"
                 f"2️⃣ 機器人會私訊 6 碼隨機密碼給房主\n"
-                f"3️⃣ 其他成員前往 **#{PASSWORD_CHANNEL}** 頻道輸入密碼，即可解鎖並加入該包廂（輸入的密碼訊息會自動銷毀確保隱私）\n"
+                f"3️⃣ 其他成員前往 **#{settings.password_channel}** 頻道輸入密碼，即可解鎖並加入該包廂（輸入的密碼訊息會自動銷毀確保隱私）\n"
                 f"4️⃣ 當所有成員離開包廂後，房間將自動銷毀且密碼立即失效"
             ),
             inline=False,
@@ -110,13 +101,13 @@ def _get_help_embed(category: str = "overview") -> discord.Embed:
             name="🛠️ 管理員指令（需「管理角色」權限）",
             value=(
                 "• `/skill create <名稱> [emoji]` — **一鍵完整建立湯技**：\n"
-                f"　 1. 建立身分組角色（`{SKILL_PREFIX}<名稱>`）\n"
-                f"　 2. 建立專屬私密分類（`{SKILL_PREFIX}<名稱> <emoji>`）\n"
+                f"　 1. 建立身分組角色（`{settings.skill_prefix}<名稱>`）\n"
+                f"　 2. 建立專屬私密分類（`{settings.skill_prefix}<名稱> <emoji>`）\n"
                 f"　 3. 建立論壇討論區（`<名稱>-討論`）\n"
                 f"　 4. 建立文字聊天室（`#<名稱>-聊天`）\n"
-                f"　 5. 建立自動語音觸發頻道（`{AUTO_VOICE_TRIGGER}`）\n"
+                f"　 5. 建立自動語音觸發頻道（`{settings.auto_voice_trigger}`）\n"
                 "　 6. 生成 8 碼邀請碼並私訊給建立者\n"
-                f"　 7. 自動更新 **#{SKILL_PANEL_CHANNEL}** 互動面板\n"
+                f"　 7. 自動更新 **#{settings.skill_panel_channel}** 互動面板\n"
                 "• `/skill delete <名稱>` — 刪除指定湯技的身分組、分類、全部專屬頻道與邀請碼\n"
                 "• `/skill info <名稱> [regenerate]` — 查看湯技邀請碼、身分組與分類資訊（可選重新產生）\n"
                 "• `/skill regen <名稱>` — 為指定湯技重新產生新的邀請碼（舊碼作廢）\n"
@@ -125,7 +116,7 @@ def _get_help_embed(category: str = "overview") -> discord.Embed:
             ),
             inline=False,
         )
-        embed.set_footer(text=f"💡 機器人啟動時會自動在 #{SKILL_PANEL_CHANNEL} 頻道維護互動面板")
+        embed.set_footer(text=f"💡 機器人啟動時會自動在 #{settings.skill_panel_channel} 頻道維護互動面板")
         return embed
 
     if category in ("leveling", "level", "等級", "活躍"):
@@ -140,9 +131,9 @@ def _get_help_embed(category: str = "overview") -> discord.Embed:
         embed.add_field(
             name="📈 經驗值 (XP) 獲取途徑",
             value=(
-                "• 💬 **文字聊天**：每則訊息獲取 `15~25 XP`（冷卻時間 60 秒，避免刷頻）\n"
-                "• 🎙️ **語音掛機**：語音頻道人數 ≥ 2 人時，每 5 分鐘獲得 `10 XP`\n"
-                "• 📅 **每日簽到**：基礎 `50 XP`，連續 7 天享 `1.5 倍`，連續 30 天享 `2.0 倍` 加成"
+                f"• 💬 **文字聊天**：每則訊息獲取 `{settings.xp_per_message_min}~{settings.xp_per_message_max} XP`（冷卻時間 {settings.xp_message_cooldown} 秒，避免刷頻）\n"
+                f"• 🎙️ **語音掛機**：語音頻道人數 ≥ 2 人時，每 {settings.xp_voice_interval // 60} 分鐘獲得 `{settings.xp_per_voice_tick} XP`\n"
+                f"• 📅 **每日簽到**：基礎 `{settings.xp_daily_base} XP`，連續 7 天享 `1.5 倍`，連續 30 天享 `2.0 倍` 加成"
             ),
             inline=False,
         )
@@ -158,7 +149,7 @@ def _get_help_embed(category: str = "overview") -> discord.Embed:
         embed.add_field(
             name="⚙️ 管理員指令（需「管理角色」權限）",
             value=(
-                f"• `/level-preview` — 預覽升級公告（發至 **#{LEVELUP_CHANNEL}**）、等級卡與排行榜效果\n"
+                f"• `/level-preview` — 預覽升級公告（發至 **#{settings.levelup_channel}**）、等級卡與排行榜效果\n"
                 "• `/level-init` — 為全體現有成員初始化等級資料並發放 LV1 起始身分組"
             ),
             inline=False,
@@ -248,12 +239,12 @@ def _get_help_embed(category: str = "overview") -> discord.Embed:
     )
     embed.add_field(
         name="🔒 私人包廂系統 (`/help private_room`)",
-        value=f"自動建立上鎖語音包廂，機器人私訊密碼給房主，其他人於 **#{PASSWORD_CHANNEL}** 輸入密碼加入。",
+        value=f"自動建立上鎖語音包廂，機器人私訊密碼給房主，其他人於 **#{settings.password_channel}** 輸入密碼加入。",
         inline=False,
     )
     embed.add_field(
         name="🏷️ 湯技角色與頻道 (`/help skill`)",
-        value=f"一鍵建立湯技身分組、分類、論壇討論區、聊天頻道與語音觸發；支援邀請碼與 **#{SKILL_PANEL_CHANNEL}** 按鈕面板。",
+        value=f"一鍵建立湯技身分組、分類、論壇討論區、聊天頻道與語音觸發；支援邀請碼與 **#{settings.skill_panel_channel}** 按鈕面板。",
         inline=False,
     )
     embed.add_field(
@@ -278,7 +269,8 @@ def _get_help_embed(category: str = "overview") -> discord.Embed:
 class HelpSelect(discord.ui.Select):
     """Dropdown select menu for navigating help categories."""
 
-    def __init__(self):
+    def __init__(self, settings: GuildSettings):
+        self.settings = settings
         options = [
             discord.SelectOption(
                 label="全部總覽",
@@ -337,16 +329,18 @@ class HelpSelect(discord.ui.Select):
         for opt in self.options:
             opt.default = opt.value == selected
 
-        embed = _get_help_embed(selected)
+        embed = _get_help_embed(self.settings, selected)
         await interaction.response.edit_message(embed=embed, view=self.view)
 
 
 class HelpView(discord.ui.View):
     """Interactive view holding the HelpSelect dropdown."""
 
-    def __init__(self, default_category: str = "overview"):
+    def __init__(
+        self, settings: GuildSettings, default_category: str = "overview"
+    ):
         super().__init__(timeout=180)
-        select = HelpSelect()
+        select = HelpSelect(settings)
         for opt in select.options:
             opt.default = opt.value == default_category
         self.add_item(select)
@@ -357,6 +351,11 @@ class HelpCommand(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    async def _get_settings(self, guild_id: int | None) -> GuildSettings:
+        if guild_id is None:
+            return GuildSettings()
+        return await self.bot.guild_settings_service.get(guild_id)
 
     @app_commands.command(
         name="help",
@@ -380,16 +379,18 @@ class HelpCommand(commands.Cog):
         category: app_commands.Choice[str] | None = None,
     ):
         selected_key = category.value if category else "overview"
-        embed = _get_help_embed(selected_key)
-        view = HelpView(default_category=selected_key)
+        settings = await self._get_settings(interaction.guild_id)
+        embed = _get_help_embed(settings, selected_key)
+        view = HelpView(settings, default_category=selected_key)
         await interaction.response.send_message(embed=embed, view=view)
 
     @commands.command(name="help")
     async def prefix_help(self, ctx: commands.Context, category: str | None = None):
         """查看機器人功能與指令說明"""
         selected_key = category or "overview"
-        embed = _get_help_embed(selected_key)
-        view = HelpView(default_category=selected_key)
+        settings = await self._get_settings(ctx.guild.id if ctx.guild else None)
+        embed = _get_help_embed(settings, selected_key)
+        view = HelpView(settings, default_category=selected_key)
         await ctx.send(embed=embed, view=view)
 
 

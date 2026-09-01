@@ -24,6 +24,11 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+# Admin API settings
+SETTINGS_DB_PATH = os.getenv("SETTINGS_DB_PATH", "data/settings.db")
+API_HOST = os.getenv("API_HOST", "0.0.0.0")
+API_PORT = int(os.getenv("API_PORT", "8000"))
+
 # i18n settings
 # Supported examples: zh-TW, zh-CN, en-US, en
 BOT_LANGUAGE = os.getenv("BOT_LANGUAGE", "zh-TW")

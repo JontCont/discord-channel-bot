@@ -1,0 +1,33 @@
+{
+  "name": "bot",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "root": "apps/bot",
+  "sourceRoot": "apps/bot",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "command": "uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py",
+      "cache": false,
+      "continuous": true
+    },
+    "test": {
+      "command": "uv run --with-requirements requirements.txt python -m unittest discover -s tests",
+      "options": {
+        "cwd": "apps/bot"
+      },
+      "cache": true,
+      "inputs": ["pythonTests"],
+      "outputs": []
+    },
+    "compile": {
+      "command": "python -m compileall -q apps/bot/bot.py apps/bot/config.py apps/bot/cogs",
+      "cache": true,
+      "inputs": ["pythonSources"],
+      "outputs": [
+        "{projectRoot}/__pycache__/**/*",
+        "{projectRoot}/cogs/**/__pycache__/**/*"
+      ]
+    }
+  },
+  "tags": ["scope:bot", "type:application"]
+}

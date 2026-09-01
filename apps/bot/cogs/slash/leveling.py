@@ -9,18 +9,9 @@ from discord.ext import commands, tasks
 
 logger = logging.getLogger("bot.leveling")
 
-from config import (
-    LEVELING_DB_PATH,
-    XP_PER_MESSAGE_MIN,
-    XP_PER_MESSAGE_MAX,
-    XP_MESSAGE_COOLDOWN,
-    XP_PER_VOICE_TICK,
-    XP_VOICE_INTERVAL,
-    XP_DAILY_BASE,
-    LEVELUP_CHANNEL,
-    LEVEL_ROLES,
-)
+from config import LEVELING_DB_PATH
 from cogs.repository.leveling_db import LevelingDB
+from cogs.service.guild_settings_service import GuildSettings
 
 
 def _progress_bar(current: int, total: int, length: int = 16) -> str:
@@ -45,8 +36,9 @@ class Leveling(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db = LevelingDB(LEVELING_DB_PATH)
-        # user_id -> last message XP timestamp (in-memory fast check)
-        self._msg_cooldowns: dict[int, float] = {}
+        # (guild_id, user_id) -> last message XP timestamp (in-memory fast check)
+        self._msg_cooldowns: dict[tuple[int, int], float] = {}
+        self._voice_next_due: dict[int, float] = {}
 
     async def cog_load(self):
         await self.db.init()
@@ -59,25 +51,34 @@ class Leveling(commands.Cog):
 
     # ── Milestone role helpers ───────────────────────────────
 
-    def _get_milestone(self, level: int) -> tuple[int, str, int] | None:
+    def _get_milestone(
+        self, level: int, level_roles: tuple[tuple[int, str, int], ...]
+    ) -> tuple[int, str, int] | None:
         """Return the highest milestone <= level."""
         result = None
-        for lv, name, color in LEVEL_ROLES:
+        for lv, name, color in level_roles:
             if lv <= level:
                 result = (lv, name, color)
         return result
 
-    def _all_milestone_names(self) -> set[str]:
-        return {name for _, name, _ in LEVEL_ROLES}
+    def _all_milestone_names(
+        self, level_roles: tuple[tuple[int, str, int], ...]
+    ) -> set[str]:
+        return {name for _, name, _ in level_roles}
 
-    async def _update_roles(self, member: discord.Member, new_level: int):
+    async def _update_roles(
+        self,
+        member: discord.Member,
+        new_level: int,
+        level_roles: tuple[tuple[int, str, int], ...],
+    ):
         """Assign the correct milestone role and remove outdated ones."""
-        milestone = self._get_milestone(new_level)
+        milestone = self._get_milestone(new_level, level_roles)
         if not milestone:
             return
 
         _, target_name, target_color = milestone
-        all_names = self._all_milestone_names()
+        all_names = self._all_milestone_names(level_roles)
 
         to_remove = [r for r in member.roles if r.name in all_names and r.name != target_name]
         target_role = discord.utils.get(member.guild.roles, name=target_name)
@@ -98,12 +99,16 @@ class Leveling(commands.Cog):
     # ── Level-up announcement ────────────────────────────────
 
     async def _announce_levelup(
-        self, member: discord.Member, old_level: int, new_level: int
+        self,
+        member: discord.Member,
+        old_level: int,
+        new_level: int,
+        settings: GuildSettings,
     ):
-        milestone = self._get_milestone(new_level)
+        milestone = self._get_milestone(new_level, settings.level_roles)
         title_name = milestone[1] if milestone else f"LV{new_level}"
 
-        xp_into, xp_needed = self.db.xp_to_next(
+        _, xp_needed = self.db.xp_to_next(
             self.db.xp_for_level(new_level), new_level
         )
 
@@ -119,11 +124,13 @@ class Leveling(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
 
         # Check if this is a milestone level
-        is_milestone = any(lv == new_level for lv, _, _ in LEVEL_ROLES)
+        is_milestone = any(lv == new_level for lv, _, _ in settings.level_roles)
         if is_milestone:
             embed.set_footer(text="🏅 里程碑達成！恭喜獲得新稱號！")
 
-        channel = discord.utils.get(member.guild.text_channels, name=LEVELUP_CHANNEL)
+        channel = discord.utils.get(
+            member.guild.text_channels, name=settings.levelup_channel
+        )
         if channel:
             await channel.send(embed=embed)
 
@@ -134,17 +141,20 @@ class Leveling(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
+        settings = await self.bot.guild_settings_service.get(message.guild.id)
         now = time.time()
-        last = self._msg_cooldowns.get(message.author.id, 0)
-        if now - last < XP_MESSAGE_COOLDOWN:
+        cooldown_key = (message.guild.id, message.author.id)
+        last = self._msg_cooldowns.get(cooldown_key, 0)
+        if now - last < settings.xp_message_cooldown:
             logger.debug(
                 "XP cooldown: user=%s remaining=%.0fs",
-                message.author, XP_MESSAGE_COOLDOWN - (now - last),
+                message.author,
+                settings.xp_message_cooldown - (now - last),
             )
             return
 
-        self._msg_cooldowns[message.author.id] = now
-        xp = random.randint(XP_PER_MESSAGE_MIN, XP_PER_MESSAGE_MAX)
+        self._msg_cooldowns[cooldown_key] = now
+        xp = random.randint(settings.xp_per_message_min, settings.xp_per_message_max)
 
         try:
             result = await self.db.add_xp(message.author.id, message.guild.id, xp)
@@ -158,29 +168,46 @@ class Leveling(commands.Cog):
         )
 
         if result["level"] > result["old_level"]:
-            await self._update_roles(message.author, result["level"])
+            await self._update_roles(
+                message.author, result["level"], settings.level_roles
+            )
             await self._announce_levelup(
-                message.author, result["old_level"], result["level"]
+                message.author, result["old_level"], result["level"], settings
             )
 
     # ── XP from voice ────────────────────────────────────────
 
-    @tasks.loop(seconds=XP_VOICE_INTERVAL)
+    @tasks.loop(seconds=30)
     async def voice_xp_loop(self):
         """Award XP to members in voice channels (≥2 non-bot members)."""
+        now = time.monotonic()
+        active_guild_ids = {guild.id for guild in self.bot.guilds}
+        for guild_id in self._voice_next_due.keys() - active_guild_ids:
+            del self._voice_next_due[guild_id]
+
         for guild in self.bot.guilds:
+            settings = await self.bot.guild_settings_service.get(guild.id)
+            if now < self._voice_next_due.get(guild.id, now):
+                continue
+
+            self._voice_next_due[guild.id] = now + settings.xp_voice_interval
             for vc in guild.voice_channels:
                 real_members = [m for m in vc.members if not m.bot]
                 if len(real_members) < 2:
                     continue
                 for member in real_members:
                     result = await self.db.add_xp(
-                        member.id, guild.id, XP_PER_VOICE_TICK
+                        member.id, guild.id, settings.xp_per_voice_tick
                     )
                     if result["level"] > result["old_level"]:
-                        await self._update_roles(member, result["level"])
+                        await self._update_roles(
+                            member, result["level"], settings.level_roles
+                        )
                         await self._announce_levelup(
-                            member, result["old_level"], result["level"]
+                            member,
+                            result["old_level"],
+                            result["level"],
+                            settings,
                         )
 
     @voice_xp_loop.before_loop
@@ -194,6 +221,7 @@ class Leveling(commands.Cog):
         description="每日簽到領取活躍值 XP（累積連續天數享倍率加成）",
     )
     async def daily(self, interaction: discord.Interaction):
+        settings = await self.bot.guild_settings_service.get(interaction.guild.id)
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         result = await self.db.do_daily(interaction.user.id, interaction.guild.id, today)
 
@@ -205,7 +233,7 @@ class Leveling(commands.Cog):
 
         streak = result["streak"]
         multiplier = _streak_multiplier(streak)
-        xp = int(XP_DAILY_BASE * multiplier)
+        xp = int(settings.xp_daily_base * multiplier)
 
         xp_result = await self.db.add_xp(
             interaction.user.id, interaction.guild.id, xp
@@ -230,9 +258,14 @@ class Leveling(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
         if xp_result["level"] > xp_result["old_level"]:
-            await self._update_roles(interaction.user, xp_result["level"])
+            await self._update_roles(
+                interaction.user, xp_result["level"], settings.level_roles
+            )
             await self._announce_levelup(
-                interaction.user, xp_result["old_level"], xp_result["level"]
+                interaction.user,
+                xp_result["old_level"],
+                xp_result["level"],
+                settings,
             )
 
     # ── /rank ────────────────────────────────────────────────
@@ -248,11 +281,12 @@ class Leveling(commands.Cog):
         member: discord.Member | None = None,
     ):
         target = member or interaction.user
+        settings = await self.bot.guild_settings_service.get(interaction.guild.id)
         user = await self.db.get_user(target.id, interaction.guild.id)
         rank_pos = await self.db.get_rank(target.id, interaction.guild.id)
 
         xp_into, xp_needed = self.db.xp_to_next(user["xp"], user["level"])
-        milestone = self._get_milestone(user["level"])
+        milestone = self._get_milestone(user["level"], settings.level_roles)
         title_name = milestone[1] if milestone else f"LV{user['level']}"
 
         bar = _progress_bar(xp_into, xp_needed)
@@ -319,10 +353,16 @@ class Leveling(commands.Cog):
     @app_commands.checks.has_permissions(manage_roles=True)
     async def level_preview(self, interaction: discord.Interaction):
         member = interaction.user
+        settings = await self.bot.guild_settings_service.get(interaction.guild.id)
 
         # 1. Level-up embed (milestone)
-        milestone_lv, milestone_name, milestone_color = LEVEL_ROLES[2]  # LV10
-        xp_needed = int(40 * (11 ** 1.2))
+        preview_role_index = min(2, len(settings.level_roles) - 1)
+        milestone_lv, milestone_name, milestone_color = settings.level_roles[
+            preview_role_index
+        ]
+        milestone_xp = self.db.xp_for_level(milestone_lv)
+        _, xp_needed = self.db.xp_to_next(milestone_xp, milestone_lv)
+        preview_progress = min(420, xp_needed)
         levelup_embed = discord.Embed(
             title="🎉 升級啦！",
             description=(
@@ -341,14 +381,23 @@ class Leveling(commands.Cog):
             color=discord.Color(milestone_color),
         )
         rank_embed.set_thumbnail(url=member.display_avatar.url)
-        rank_embed.add_field(name="等級", value="**LV10**", inline=True)
+        rank_embed.add_field(
+            name="等級", value=f"**LV{milestone_lv}**", inline=True
+        )
         rank_embed.add_field(name="排名", value="#3", inline=True)
-        rank_embed.add_field(name="總 XP", value="3,158", inline=True)
+        rank_embed.add_field(
+            name="總 XP",
+            value=f"{milestone_xp + preview_progress:,}",
+            inline=True,
+        )
         rank_embed.add_field(name="稱號", value=milestone_name, inline=True)
         rank_embed.add_field(name="連續簽到", value="🔥 7 天", inline=True)
         rank_embed.add_field(
             name="升級進度",
-            value=f"{_progress_bar(420, xp_needed)} `420/{xp_needed} XP`",
+            value=(
+                f"{_progress_bar(preview_progress, xp_needed)} "
+                f"`{preview_progress}/{xp_needed} XP`"
+            ),
             inline=False,
         )
 
@@ -367,7 +416,7 @@ class Leveling(commands.Cog):
 
         await interaction.response.send_message(
             content="**以下是等級系統各功能的預覽：**\n\n"
-                    "**① 升級公告**（發送至 #等級公告）",
+                f"**① 升級公告**（發送至 #{settings.levelup_channel}）",
             embed=levelup_embed,
             ephemeral=True,
         )
@@ -401,6 +450,7 @@ class Leveling(commands.Cog):
     async def level_init(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
 
         initialized = 0
         skipped = 0
@@ -413,14 +463,15 @@ class Leveling(commands.Cog):
 
             # Check if member already has any level role
             has_level_role = any(
-                r.name in self._all_milestone_names() for r in member.roles
+                r.name in self._all_milestone_names(settings.level_roles)
+                for r in member.roles
             )
 
             if has_level_role and user["xp"] > 0:
                 skipped += 1
                 continue
 
-            await self._update_roles(member, user["level"])
+            await self._update_roles(member, user["level"], settings.level_roles)
             initialized += 1
 
         await interaction.followup.send(
