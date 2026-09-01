@@ -1,24 +1,29 @@
 import { Bot, LogIn, ShieldCheck } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
+import { LanguageSwitcher } from './LanguageSwitcher'
 
 export function LoginScreen() {
+  const { t } = useTranslation()
+
   return (
     <main className="login-page">
+      <LanguageSwitcher className="login-language" />
       <section className="login-panel" aria-labelledby="login-title">
         <div className="brand-mark"><Bot aria-hidden="true" /></div>
-        <p className="eyebrow">Channel Bot Console</p>
-        <h1 id="login-title">Manage your Discord servers</h1>
+        <p className="eyebrow">{t('login.eyebrow')}</p>
+        <h1 id="login-title">{t('login.title')}</h1>
         <p className="login-copy">
-          Sign in with Discord to configure voice rooms, skills, and leveling for servers you manage.
+          {t('login.description')}
         </p>
         <a className="button primary login-button" href="/api/auth/login">
-          <LogIn aria-hidden="true" /> Continue with Discord
+          <LogIn aria-hidden="true" /> {t('login.continue')}
         </a>
-        <p className="privacy-note"><ShieldCheck aria-hidden="true" /> Authentication stays in a secure server session.</p>
-        <nav className="login-legal" aria-label="Legal information">
-          <Link to="/privacy">Privacy Policy</Link>
+        <p className="privacy-note"><ShieldCheck aria-hidden="true" /> {t('login.secure')}</p>
+        <nav className="login-legal" aria-label={t('login.legalLabel')}>
+          <Link to="/privacy">{t('login.privacy')}</Link>
           <span aria-hidden="true">·</span>
-          <Link to="/terms">Terms of Service</Link>
+          <Link to="/terms">{t('login.terms')}</Link>
         </nav>
       </section>
     </main>

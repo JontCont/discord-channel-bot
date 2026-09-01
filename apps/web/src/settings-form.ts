@@ -1,9 +1,13 @@
 import { z } from 'zod'
+import type { TFunction } from 'i18next'
 import type { GuildSettings } from './api'
 
-const requiredText = z.string().trim().min(1, 'This field is required')
-
-function validateLevelRoles(value: string, context: z.RefinementCtx) {
+function validateLevelRoles(
+  value: string,
+  context: z.RefinementCtx,
+  t: TFunction,
+  requiredText: z.ZodString,
+) {
   const addIssue = (message: string) =>
     context.addIssue({ code: 'custom', path: ['level_roles'], message })
 
@@ -14,25 +18,28 @@ function validateLevelRoles(value: string, context: z.RefinementCtx) {
       .min(1)
       .safeParse(parsed)
     if (!result.success) {
-      addIssue('Use [[level, "Role name", colorNumber], ...]')
+      addIssue(t('settings.validation.levelRolesFormat'))
       return
     }
 
     const levels = result.data.map(([level]) => level)
     const names = result.data.map(([, name]) => name)
     if (new Set(levels).size !== levels.length || new Set(names).size !== names.length) {
-      addIssue('Role levels and names must be unique')
+      addIssue(t('settings.validation.uniqueRoles'))
       return
     }
     if (levels.some((level, index) => index > 0 && level < levels[index - 1]!)) {
-      addIssue('Roles must be ordered by level')
+      addIssue(t('settings.validation.orderedRoles'))
     }
   } catch {
-    addIssue('Enter valid JSON')
+    addIssue(t('settings.validation.validJson'))
   }
 }
 
-export const settingsFormSchema = z
+export const createSettingsFormSchema = (t: TFunction) => {
+  const requiredText = z.string().trim().min(1, t('settings.validation.required'))
+
+  return z
   .object({
     auto_voice_trigger: requiredText,
     auto_voice_suffix: requiredText,
@@ -59,14 +66,14 @@ export const settingsFormSchema = z
       context.addIssue({
         code: 'custom',
         path: ['private_trigger'],
-        message: 'Trigger names must be different',
+        message: t('settings.validation.differentTriggers'),
       })
     }
     if (values.xp_per_message_min > values.xp_per_message_max) {
       context.addIssue({
         code: 'custom',
         path: ['xp_per_message_max'],
-        message: 'Maximum must be at least the minimum',
+        message: t('settings.validation.maximumMinimum'),
       })
     }
     const skills = values.skill_panel_direct_join_skills
@@ -77,14 +84,15 @@ export const settingsFormSchema = z
       context.addIssue({
         code: 'custom',
         path: ['skill_panel_direct_join_skills'],
-        message: 'Skill names must be unique',
+        message: t('settings.validation.uniqueSkills'),
       })
     }
-    validateLevelRoles(values.level_roles, context)
+    validateLevelRoles(values.level_roles, context, t, requiredText)
   })
+}
 
-export type SettingsFormValues = z.input<typeof settingsFormSchema>
-export type ValidSettingsFormValues = z.output<typeof settingsFormSchema>
+export type SettingsFormValues = z.input<ReturnType<typeof createSettingsFormSchema>>
+export type ValidSettingsFormValues = z.output<ReturnType<typeof createSettingsFormSchema>>
 
 export function settingsToForm(settings: GuildSettings): ValidSettingsFormValues {
   return {
