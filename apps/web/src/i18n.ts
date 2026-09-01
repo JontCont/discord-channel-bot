@@ -14,6 +14,10 @@ const resources = {
         retry: 'Retry',
         loading: 'Loading dashboard',
       },
+      theme: {
+        dark: 'Use dark theme',
+        light: 'Use light theme',
+      },
       auth: {
         starting: 'Starting your session',
         opening: 'Opening sign in',
@@ -170,6 +174,10 @@ const resources = {
         retry: '重試',
         loading: '正在載入控制台',
       },
+      theme: {
+        dark: '切換至深色模式',
+        light: '切換至亮色模式',
+      },
       auth: {
         starting: '正在啟動工作階段',
         opening: '正在開啟登入頁面',
@@ -325,6 +333,10 @@ const resources = {
         productHome: 'Channel Bot コンソールのホーム',
         retry: '再試行',
         loading: 'ダッシュボードを読み込み中',
+      },
+      theme: {
+        dark: 'ダークテーマに切り替え',
+        light: 'ライトテーマに切り替え',
       },
       auth: {
         starting: 'セッションを開始しています',

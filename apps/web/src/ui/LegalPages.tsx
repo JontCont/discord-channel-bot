@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { Bot } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LanguageSwitcher } from './LanguageSwitcher'
+import { DisplayControls } from './DisplayControls'
 
 function LegalPage({ title, children }: { title: string; children: ReactNode }) {
   const { t } = useTranslation()
@@ -18,7 +18,7 @@ function LegalPage({ title, children }: { title: string; children: ReactNode }) 
             <Link to="/privacy" activeProps={{ 'aria-current': 'page' }}>{t('legal.privacyNav')}</Link>
             <Link to="/terms" activeProps={{ 'aria-current': 'page' }}>{t('legal.termsNav')}</Link>
           </nav>
-          <LanguageSwitcher />
+          <DisplayControls />
         </div>
       </header>
       <main className="legal-page">

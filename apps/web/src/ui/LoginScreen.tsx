@@ -1,14 +1,14 @@
 import { Bot, LogIn, ShieldCheck } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { LanguageSwitcher } from './LanguageSwitcher'
+import { DisplayControls } from './DisplayControls'
 
 export function LoginScreen() {
   const { t } = useTranslation()
 
   return (
     <main className="login-page">
-      <LanguageSwitcher className="login-language" />
+      <DisplayControls className="login-display-controls" />
       <section className="login-panel" aria-labelledby="login-title">
         <div className="brand-mark"><Bot aria-hidden="true" /></div>
         <p className="eyebrow">{t('login.eyebrow')}</p>

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ApiError, getMe } from '../api'
 import { ErrorState, LoadingState } from './States'
-import { LanguageSwitcher } from './LanguageSwitcher'
+import { DisplayControls } from './DisplayControls'
 
 export function AuthenticatedLayout() {
   const { t } = useTranslation()
@@ -46,7 +46,7 @@ export function AuthenticatedLayout() {
           <span>Channel Bot</span>
         </Link>
         <div className="account">
-          <LanguageSwitcher />
+          <DisplayControls />
           {user.avatar_url ? <img src={user.avatar_url} alt="" /> : <span className="avatar-fallback">{displayName.charAt(0)}</span>}
           <span className="account-name">{displayName}</span>
           <button
