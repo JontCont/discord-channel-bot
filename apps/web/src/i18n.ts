@@ -61,7 +61,7 @@ const resources = {
           passwordChannel: 'Password channel',
           commandPrefix: 'Command prefix',
           panelChannel: 'Panel channel',
-          directJoinSkills: 'Direct-join skills',
+          directJoinSkills: 'Skills shown on panel',
           messageXpMin: 'Message XP minimum',
           messageXpMax: 'Message XP maximum',
           messageCooldown: 'Message cooldown (seconds)',
@@ -73,7 +73,7 @@ const resources = {
         },
         hints: {
           userLimit: '0 allows unlimited members; maximum 99.',
-          directJoinSkills: 'One unique skill name per line.',
+          directJoinSkills: 'Only these skills appear on the panel. Enter one unique name per line.',
           levelRoles: 'JSON rows: [level, "role name", decimal color].',
         },
         status: {
@@ -221,7 +221,7 @@ const resources = {
           passwordChannel: '密碼頻道',
           commandPrefix: '指令前綴',
           panelChannel: '面板頻道',
-          directJoinSkills: '直接加入技能',
+          directJoinSkills: '面板顯示技能',
           messageXpMin: '訊息經驗值下限',
           messageXpMax: '訊息經驗值上限',
           messageCooldown: '訊息冷卻時間（秒）',
@@ -233,7 +233,7 @@ const resources = {
         },
         hints: {
           userLimit: '0 代表不限人數；最高為 99。',
-          directJoinSkills: '每行輸入一個不重複的技能名稱。',
+          directJoinSkills: '只有這些技能會顯示在面板上；每行輸入一個不重複的名稱。',
           levelRoles: 'JSON 列格式：[等級, "身分組名稱", 十進位色碼]。',
         },
         status: {
@@ -381,7 +381,7 @@ const resources = {
           passwordChannel: 'パスワードチャンネル',
           commandPrefix: 'コマンド接頭辞',
           panelChannel: 'パネルチャンネル',
-          directJoinSkills: '直接参加スキル',
+          directJoinSkills: 'パネルに表示するスキル',
           messageXpMin: 'メッセージ XP 最小値',
           messageXpMax: 'メッセージ XP 最大値',
           messageCooldown: 'メッセージ待機時間（秒）',
@@ -393,7 +393,7 @@ const resources = {
         },
         hints: {
           userLimit: '0 は人数無制限、最大は 99 です。',
-          directJoinSkills: '1行に一意のスキル名を1つ入力してください。',
+          directJoinSkills: 'ここに設定したスキルのみパネルに表示されます。1行に1つ入力してください。',
           levelRoles: 'JSON 行：[レベル, "ロール名", 10進カラー]。',
         },
         status: {

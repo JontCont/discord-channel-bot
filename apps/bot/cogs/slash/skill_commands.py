@@ -108,6 +108,14 @@ class SkillCommands(commands.GroupCog, name="skill"):
     ) -> list[tuple[str, str | None]]:
         return self.skill_service.get_skills(guild, settings.skill_prefix)
 
+    def _get_panel_skills(
+        self, guild: discord.Guild, settings: GuildSettings
+    ) -> list[tuple[str, str | None]]:
+        return self.skill_service.filter_panel_skills(
+            self._get_skills(guild, settings),
+            settings.skill_panel_direct_join_skills,
+        )
+
     def _build_panel_embed(
         self,
         skills: list[tuple[str, str | None]],
@@ -143,7 +151,7 @@ class SkillCommands(commands.GroupCog, name="skill"):
         if not channel:
             return
 
-        skills = self._get_skills(guild, settings)
+        skills = self._get_panel_skills(guild, settings)
         if not skills:
             return
 
@@ -174,7 +182,7 @@ class SkillCommands(commands.GroupCog, name="skill"):
         """Auto-post/update skill panel in #湯技 on startup."""
         for guild in self.bot.guilds:
             settings = await self.bot.guild_settings_service.get(guild.id)
-            skills = self._get_skills(guild, settings)
+            skills = self._get_panel_skills(guild, settings)
             if skills:
                 self.bot.add_view(SkillPanelView(self.bot, self.skill_service, skills))
             await self._refresh_panel(guild, settings)
@@ -602,11 +610,12 @@ class SkillCommands(commands.GroupCog, name="skill"):
     async def skill_panel(self, interaction: discord.Interaction):
         guild = interaction.guild
         settings = await self.bot.guild_settings_service.get(guild.id)
-        skills = self._get_skills(guild, settings)
+        skills = self._get_panel_skills(guild, settings)
 
         if not skills:
             await interaction.response.send_message(
-                "❌ 目前沒有任何湯技，請先使用 `/skill create` 建立。", ephemeral=True
+                "❌ 面板設定中沒有可用的湯技，請先在 Web 後台設定面板顯示清單。",
+                ephemeral=True,
             )
             return
 

@@ -61,6 +61,17 @@ class SkillService:
                 skills.append((skill_name, emoji))
         return skills
 
+    @staticmethod
+    def filter_panel_skills(
+        skills: list[tuple[str, str | None]], configured_names: tuple[str, ...]
+    ) -> list[tuple[str, str | None]]:
+        available = {name.casefold(): (name, emoji) for name, emoji in skills}
+        return [
+            available[name.casefold()]
+            for name in configured_names
+            if name.casefold() in available
+        ]
+
     def build_panel_embed(
         self,
         skills: list[tuple[str, str | None]],
