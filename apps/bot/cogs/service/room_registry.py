@@ -24,12 +24,15 @@ class RoomRegistry:
         *,
         private: bool = False,
         password: str | None = None,
+        party: dict | None = None,
     ):
         self.active_channels[channel_id] = {
             "owner": owner_id,
             "private": private,
             "password": password,
         }
+        if party is not None:
+            self.active_channels[channel_id]["party"] = dict(party)
         self._save()
 
     def unregister(self, channel_id: int):
@@ -52,11 +55,14 @@ class RoomRegistry:
             for channel_id, info in payload.items():
                 if not isinstance(info, dict) or not isinstance(info.get("owner"), int):
                     continue
-                self.active_channels[int(channel_id)] = {
+                room = {
                     "owner": info["owner"],
                     "private": bool(info.get("private", False)),
                     "password": info.get("password"),
                 }
+                if isinstance(info.get("party"), dict):
+                    room["party"] = dict(info["party"])
+                self.active_channels[int(channel_id)] = room
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             logger.exception("Failed to load room registry from %s", self._path)
 

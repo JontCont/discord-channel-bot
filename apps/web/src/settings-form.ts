@@ -52,6 +52,7 @@ export const createSettingsFormSchema = (t: TFunction) => {
     skill_prefix: requiredText,
     skill_panel_channel: requiredText,
     skill_panel_direct_join_skills: z.string(),
+    party_category: requiredText,
     xp_per_message_min: z.coerce.number().int().min(0),
     xp_per_message_max: z.coerce.number().int().min(0),
     xp_message_cooldown: z.coerce.number().int().min(0),

@@ -404,6 +404,19 @@ def create_api(
         settings = await settings_service.get(guild_id)
         return {"settings": settings.to_dict()}
 
+    @app.get("/api/guilds/{guild_id}/categories")
+    async def get_categories(
+        guild_id: int,
+        auth: AuthenticatedSession = Depends(require_session),
+    ) -> dict[str, Any]:
+        await require_guild(guild_id, auth)
+        guild = discord_bot.get_guild(guild_id)
+        categories = [
+            {"id": str(category.id), "name": category.name}
+            for category in guild.categories
+        ]
+        return {"categories": categories}
+
     @app.put("/api/guilds/{guild_id}/settings")
     async def update_settings(
         guild_id: int,

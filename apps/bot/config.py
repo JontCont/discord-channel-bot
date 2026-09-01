@@ -110,6 +110,7 @@ SKILL_PANEL_DIRECT_JOIN_SKILLS = _parse_name_list(
         "鍛造術,遊戲術,墨繪術,幻想術",
     )
 )
+PARTY_CATEGORY = os.getenv("PARTY_CATEGORY", "湯技：遊戲術 🎮")
 
 # Leveling settings
 LEVELING_DB_PATH = os.getenv("LEVELING_DB_PATH", "data/leveling.db")

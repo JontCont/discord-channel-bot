@@ -50,6 +50,11 @@ const guildSchema = z.object({
   icon_url: z.url().nullish(),
 })
 
+const categorySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+
 export const settingsSchema = z
   .object({
     auto_voice_trigger: z.string(),
@@ -63,6 +68,7 @@ export const settingsSchema = z
     skill_prefix: z.string(),
     skill_panel_channel: z.string(),
     skill_panel_direct_join_skills: z.array(z.string()),
+    party_category: z.string(),
     xp_per_message_min: z.number().int(),
     xp_per_message_max: z.number().int(),
     xp_message_cooldown: z.number().int(),
@@ -76,6 +82,7 @@ export const settingsSchema = z
 
 export type User = z.infer<typeof meSchema>
 export type Guild = z.infer<typeof guildSchema>
+export type GuildCategory = z.infer<typeof categorySchema>
 export type GuildSettings = z.infer<typeof settingsSchema>
 
 function unwrap<T>(data: unknown, key: string, schema: z.ZodType<T>): T {
@@ -98,6 +105,14 @@ export async function getGuildSettings(guildId: string): Promise<GuildSettings> 
     await apiRequest(`/api/guilds/${encodeURIComponent(guildId)}/settings`),
     'settings',
     settingsSchema,
+  )
+}
+
+export async function getGuildCategories(guildId: string): Promise<GuildCategory[]> {
+  return unwrap(
+    await apiRequest(`/api/guilds/${encodeURIComponent(guildId)}/categories`),
+    'categories',
+    z.array(categorySchema),
   )
 }
 

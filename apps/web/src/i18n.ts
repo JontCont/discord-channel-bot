@@ -62,6 +62,7 @@ const resources = {
           commandPrefix: 'Command prefix',
           panelChannel: 'Panel channel',
           directJoinSkills: 'Skills shown on panel',
+          partyCategory: 'Party category',
           messageXpMin: 'Message XP minimum',
           messageXpMax: 'Message XP maximum',
           messageCooldown: 'Message cooldown (seconds)',
@@ -74,6 +75,7 @@ const resources = {
         hints: {
           userLimit: '0 allows unlimited members; maximum 99.',
           directJoinSkills: 'Only these skills appear on the panel. Enter one unique name per line.',
+          partyCategory: 'Party features are limited to this Discord category. New voice rooms are also created there. Defaults to 湯技：遊戲術 🎮.',
           levelRoles: 'JSON rows: [level, "role name", decimal color].',
         },
         status: {
@@ -81,6 +83,8 @@ const resources = {
           unsaved: 'Unsaved changes',
           saving: 'Saving...',
           save: 'Save settings',
+          loadingCategories: 'Loading categories...',
+          missingCategory: '{{category}} (category not found)',
         },
         validation: {
           required: 'This field is required',
@@ -222,6 +226,7 @@ const resources = {
           commandPrefix: '指令前綴',
           panelChannel: '面板頻道',
           directJoinSkills: '面板顯示技能',
+          partyCategory: '揪團限定類別',
           messageXpMin: '訊息經驗值下限',
           messageXpMax: '訊息經驗值上限',
           messageCooldown: '訊息冷卻時間（秒）',
@@ -234,6 +239,7 @@ const resources = {
         hints: {
           userLimit: '0 代表不限人數；最高為 99。',
           directJoinSkills: '只有這些技能會顯示在面板上；每行輸入一個不重複的名稱。',
+          partyCategory: '揪團功能只能在此 Discord 類別下使用，新語音房也會建立於此；預設為「湯技：遊戲術 🎮」。',
           levelRoles: 'JSON 列格式：[等級, "身分組名稱", 十進位色碼]。',
         },
         status: {
@@ -241,6 +247,8 @@ const resources = {
           unsaved: '有尚未儲存的變更',
           saving: '儲存中...',
           save: '儲存設定',
+          loadingCategories: '正在載入類別...',
+          missingCategory: '{{category}}（找不到此類別）',
         },
         validation: {
           required: '此欄位為必填',
@@ -382,6 +390,7 @@ const resources = {
           commandPrefix: 'コマンド接頭辞',
           panelChannel: 'パネルチャンネル',
           directJoinSkills: 'パネルに表示するスキル',
+          partyCategory: 'パーティーカテゴリー',
           messageXpMin: 'メッセージ XP 最小値',
           messageXpMax: 'メッセージ XP 最大値',
           messageCooldown: 'メッセージ待機時間（秒）',
@@ -394,6 +403,7 @@ const resources = {
         hints: {
           userLimit: '0 は人数無制限、最大は 99 です。',
           directJoinSkills: 'ここに設定したスキルのみパネルに表示されます。1行に1つ入力してください。',
+          partyCategory: 'パーティー機能はこの Discord カテゴリー内でのみ利用でき、新しいボイスルームもここに作成されます。デフォルトは「湯技：遊戲術 🎮」です。',
           levelRoles: 'JSON 行：[レベル, "ロール名", 10進カラー]。',
         },
         status: {
@@ -401,6 +411,8 @@ const resources = {
           unsaved: '未保存の変更があります',
           saving: '保存中...',
           save: '設定を保存',
+          loadingCategories: 'カテゴリーを読み込み中...',
+          missingCategory: '{{category}}（カテゴリーが見つかりません）',
         },
         validation: {
           required: 'この項目は必須です',

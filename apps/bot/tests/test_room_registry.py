@@ -11,7 +11,13 @@ class RoomRegistryTests(unittest.TestCase):
             path = Path(directory) / "rooms.json"
             registry = RoomRegistry(path)
             registry.register(101, 201)
-            registry.register(102, 202, private=True, password="ABC123")
+            registry.register(
+                102,
+                202,
+                private=True,
+                password="ABC123",
+                party={"game": "CS2", "title": "缺二"},
+            )
 
             reloaded = RoomRegistry(path)
 
@@ -24,6 +30,7 @@ class RoomRegistryTests(unittest.TestCase):
                 "owner": 202,
                 "private": True,
                 "password": "ABC123",
+                "party": {"game": "CS2", "title": "缺二"},
             })
 
             reloaded.unregister(101)

@@ -41,6 +41,7 @@ COGS = [
     "cogs.slash.auto_voice",
     "cogs.slash.private_room",
     "cogs.slash.skill_commands",
+    "cogs.slash.party",
     "cogs.slash.leveling",
     "cogs.slash.help",
 ]

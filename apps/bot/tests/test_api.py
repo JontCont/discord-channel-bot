@@ -33,6 +33,7 @@ class FakeSettings:
             "skill_prefix": "!",
             "skill_panel_channel": "skills",
             "skill_panel_direct_join_skills": ["Music"],
+            "party_category": "Gaming",
             "xp_per_message_min": 1,
             "xp_per_message_max": 3,
             "xp_message_cooldown": 10,
@@ -67,12 +68,31 @@ class FakeSettingsService:
         return settings
 
 
+@dataclass
+class FakeCategory:
+    id: int
+    name: str
+
+
+@dataclass
+class FakeGuild:
+    categories: list[FakeCategory]
+
+
 class FakeBot:
     def __init__(self, guild_ids: set[int]):
-        self.guild_ids = guild_ids
+        self.guilds = {
+            guild_id: FakeGuild(
+                categories=[
+                    FakeCategory(guild_id + 1, "遊戲術"),
+                    FakeCategory(guild_id + 2, "私人包廂"),
+                ]
+            )
+            for guild_id in guild_ids
+        }
 
-    def get_guild(self, guild_id: int) -> object | None:
-        return object() if guild_id in self.guild_ids else None
+    def get_guild(self, guild_id: int) -> FakeGuild | None:
+        return self.guilds.get(guild_id)
 
 
 @unittest.skipUnless(HAS_API_DEPENDENCIES, "FastAPI and HTTPX are not installed")
@@ -170,6 +190,7 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             ("GET", "/api/me"),
             ("GET", "/api/guilds"),
             ("GET", "/api/guilds/100/settings"),
+            ("GET", "/api/guilds/100/categories"),
             ("PUT", "/api/guilds/100/settings"),
         ):
             with self.subTest(method=method, path=path):
@@ -210,6 +231,20 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             if request.url.path == "/api/v10/users/@me/guilds"
         ]
         self.assertEqual(len(guild_checks), 2)
+
+    async def test_categories_returns_guild_categories(self):
+        self.authenticate()
+
+        response = await self.client.get("/api/guilds/100/categories")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["categories"],
+            [
+                {"id": "101", "name": "遊戲術"},
+                {"id": "102", "name": "私人包廂"},
+            ],
+        )
 
     async def test_settings_rejects_unauthorized_and_unknown_values(self):
         self.authenticate()

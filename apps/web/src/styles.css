@@ -123,11 +123,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .field:has(textarea), .compact-grid .field:last-child { grid-column: 1 / -1; }
 .field-label { font-size: 14px; font-weight: 700; }
 .field-hint { color: var(--muted); font-size: 12px; line-height: 1.4; }
-.field input, .field textarea { width: 100%; padding: 10px 11px; color: var(--text); background: var(--input); border: 1px solid var(--input-border); border-radius: 5px; outline: none; }
+.field input, .field textarea, .field select { width: 100%; padding: 10px 11px; color: var(--text); background: var(--input); border: 1px solid var(--input-border); border-radius: 5px; outline: none; }
 .field textarea { resize: vertical; line-height: 1.5; }
-.field input:hover, .field textarea:hover { border-color: var(--input-border-hover); }
-.field input:focus, .field textarea:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--input-focus-ring); }
-.field:has(.field-error) input, .field:has(.field-error) textarea { border-color: var(--danger); }
+.field input:hover, .field textarea:hover, .field select:hover { border-color: var(--input-border-hover); }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--input-focus-ring); }
+.field:has(.field-error) input, .field:has(.field-error) textarea, .field:has(.field-error) select { border-color: var(--danger); }
 .field-error { color: var(--danger); font-size: 12px; font-weight: 600; }
 .code-input { font-family: 'IBM Plex Mono', monospace !important; font-size: 13px; }
 

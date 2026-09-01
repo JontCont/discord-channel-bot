@@ -22,6 +22,7 @@ class GuildSettings:
     skill_panel_direct_join_skills: tuple[str, ...] = tuple(
         config.SKILL_PANEL_DIRECT_JOIN_SKILLS
     )
+    party_category: str = config.PARTY_CATEGORY
 
     xp_per_message_min: int = config.XP_PER_MESSAGE_MIN
     xp_per_message_max: int = config.XP_PER_MESSAGE_MAX
@@ -53,6 +54,7 @@ class GuildSettingsService:
             "password_channel",
             "skill_prefix",
             "skill_panel_channel",
+            "party_category",
             "levelup_channel",
         }
     )
@@ -99,12 +101,18 @@ class GuildSettingsService:
 
     @classmethod
     def _build(cls, values: Mapping[str, Any]) -> GuildSettings:
-        unknown = set(values) - cls._FIELD_NAMES
+        normalized = dict(values)
+        legacy_party_skill = normalized.pop("party_skill", None)
+        if "party_category" not in normalized and isinstance(legacy_party_skill, str):
+            normalized["party_category"] = legacy_party_skill
+        if normalized.get("party_category") == "遊戲術":
+            normalized["party_category"] = config.PARTY_CATEGORY
+
+        unknown = set(normalized) - cls._FIELD_NAMES
         if unknown:
             names = ", ".join(sorted(str(key) for key in unknown))
             raise ValueError(f"unknown setting keys: {names}")
 
-        normalized = dict(values)
         if "skill_panel_direct_join_skills" in normalized:
             normalized["skill_panel_direct_join_skills"] = cls._validate_names(
                 "skill_panel_direct_join_skills",

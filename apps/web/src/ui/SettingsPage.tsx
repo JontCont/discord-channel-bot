@@ -5,7 +5,7 @@ import { ArrowLeft, Check, Save, Settings2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { getGuildSettings, getGuilds, updateGuildSettings } from '../api'
+import { getGuildCategories, getGuildSettings, getGuilds, updateGuildSettings } from '../api'
 import {
   formToSettings,
   createSettingsFormSchema,
@@ -40,6 +40,10 @@ function SettingsForm({ guildId }: { guildId: string }) {
     queryKey: ['guild-settings', guildId],
     queryFn: () => getGuildSettings(guildId),
   })
+  const categories = useQuery({
+    queryKey: ['guild-categories', guildId],
+    queryFn: () => getGuildCategories(guildId),
+  })
   const form = useForm<SettingsFormValues, unknown, ValidSettingsFormValues>({
     resolver: zodResolver(createSettingsFormSchema(t)),
   })
@@ -69,6 +73,8 @@ function SettingsForm({ guildId }: { guildId: string }) {
 
   const errors = form.formState.errors
   const inputError = (name: keyof SettingsFormValues) => errors[name]?.message?.toString()
+  const selectedPartyCategory = form.watch('party_category')
+  const selectedCategoryExists = categories.data?.some((category) => category.name === selectedPartyCategory)
 
   return (
     <form className="settings-form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
@@ -101,6 +107,14 @@ function SettingsForm({ guildId }: { guildId: string }) {
           <Field label={t('settings.fields.commandPrefix')} error={inputError('skill_prefix')}><input {...form.register('skill_prefix')} /></Field>
           <Field label={t('settings.fields.panelChannel')} error={inputError('skill_panel_channel')}><input {...form.register('skill_panel_channel')} /></Field>
           <Field label={t('settings.fields.directJoinSkills')} hint={t('settings.hints.directJoinSkills')} error={inputError('skill_panel_direct_join_skills')}><textarea rows={5} {...form.register('skill_panel_direct_join_skills')} /></Field>
+          <Field label={t('settings.fields.partyCategory')} hint={t('settings.hints.partyCategory')} error={inputError('party_category')}>
+            <select {...form.register('party_category')} disabled={categories.isLoading}>
+              {categories.isLoading && <option value={selectedPartyCategory}>{t('settings.status.loadingCategories')}</option>}
+              {!categories.isLoading && selectedPartyCategory && !selectedCategoryExists && <option value={selectedPartyCategory}>{t('settings.status.missingCategory', { category: selectedPartyCategory })}</option>}
+              {categories.data?.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
+            </select>
+            {categories.isError && <span className="field-error" role="alert">{categories.error.message}</span>}
+          </Field>
         </div>
       </section>
 

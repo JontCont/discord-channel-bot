@@ -1,4 +1,5 @@
 import logging
+import time
 
 import discord
 from discord import app_commands
@@ -94,7 +95,7 @@ class AutoVoice(commands.Cog):
     @tasks.loop(minutes=1)
     async def cleanup_empty_rooms(self):
         """Recover missed voice events and remove orphaned dynamic rooms."""
-        for channel_id, _info in self.registry.entries():
+        for channel_id, info in self.registry.entries():
             channel = self.bot.get_channel(channel_id)
             if channel is None:
                 self.registry.unregister(channel_id)
@@ -103,6 +104,11 @@ class AutoVoice(commands.Cog):
                 self.registry.unregister(channel_id)
                 continue
             if not channel.members:
+                party = info.get("party")
+                if isinstance(party, dict):
+                    created_at = int(party.get("created_at", 0))
+                    if time.time() - created_at < 5 * 60:
+                        continue
                 await self._delete_registered_channel(
                     channel, reason="Auto-voice: periodic empty-room cleanup"
                 )
