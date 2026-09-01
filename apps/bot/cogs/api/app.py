@@ -2,6 +2,7 @@ import logging
 import os
 import secrets
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 from urllib.parse import urlencode
@@ -214,14 +215,20 @@ def create_api(
     owns_http_client = http_client is None
     discord_http = http_client or httpx.AsyncClient(timeout=10.0)
     discord = DiscordClient(discord_http, api_config)
-    app = FastAPI()
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            yield
+        finally:
+            if owns_http_client:
+                await discord_http.aclose()
+
+    app = FastAPI(lifespan=lifespan)
 
     app.state.session_store = sessions
     app.state.state_store = states
     app.state.discord_client = discord
-
-    if owns_http_client:
-        app.add_event_handler("shutdown", discord_http.aclose)
 
     def require_session(request: Request) -> AuthenticatedSession:
         session_id = request.cookies.get(SESSION_COOKIE)
