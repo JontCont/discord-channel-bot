@@ -78,21 +78,33 @@ pnpm nx run web:typecheck
 pnpm nx run web:build
 ```
 
-### Docker 啟動
+### NAS Docker 啟動
+
+NAS 只需要 `docker-compose.yml` 與 `.env`，不需要上傳 source code。先建立
+`data`、`logs` 目錄，再拉取 GHCR images 並啟動：
+
+```bash
+mkdir -p data logs
+docker compose pull
+docker compose up -d
+docker compose logs -f
+```
+
+若 GHCR package 設為 private，請先登入：
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
+
+更新版本時再次執行 `docker compose pull` 與 `docker compose up -d`。預設使用
+`latest`，也可在 `.env` 以 `BOT_IMAGE`、`WEB_IMAGE` 指定固定版本。
+
+### 本機 Docker 建置
+
+完整 source code 環境可使用本機 Compose 自行建置 images：
 
 ```powershell
-# 1. 設定環境變數
-copy .env.example .env
-# 編輯 .env 填入你的 Bot Token
-
-# 2. 構建並啟動容器
-docker compose up -d --build
-
-# 3. 查看日誌
-docker compose logs -f
-
-# 4. 停止服務
-docker compose down
+docker compose -f docker-compose.local.yml up -d --build
 ```
 
 ---
@@ -139,6 +151,8 @@ discord-channel-bot/
 | `SETTINGS_DB_PATH` | — | `data/settings.db` | Guild 動態設定資料庫 |
 | `API_HOST` | — | `0.0.0.0` | Settings API listen host |
 | `API_PORT` | — | `8000` | Settings API listen port |
+| `BOT_IMAGE` | — | `ghcr.io/jontcont/discord-channel-bot-bot:latest` | NAS 使用的 Bot image |
+| `WEB_IMAGE` | — | `ghcr.io/jontcont/discord-channel-bot-web:latest` | NAS 使用的 Web image |
 | `BOT_PREFIX` | — | `!` | 前綴指令符號 |
 | `LOG_LEVEL` | — | `INFO` | 日誌等級（DEBUG / INFO / WARNING / ERROR） |
 | `BOT_LANGUAGE` | — | `zh-TW` | 語系預設（如 `zh-TW` / `en-US`）。未自訂名稱時會套用對應語言預設值 |

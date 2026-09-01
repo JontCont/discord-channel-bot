@@ -1,9 +1,6 @@
 services:
   bot:
-    build:
-      context: ./apps/bot
-      dockerfile: Dockerfile
-    image: discord-channel-bot:local
+    image: ${BOT_IMAGE:-ghcr.io/jontcont/discord-channel-bot-bot:latest}
     container_name: discord-channel-bot
     env_file: ${COMPOSE_SERVICE_ENV_FILE:-.env}
     restart: unless-stopped
@@ -14,10 +11,7 @@ services:
       - ./data:/app/data
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    image: discord-channel-web:local
+    image: ${WEB_IMAGE:-ghcr.io/jontcont/discord-channel-bot-web:latest}
     depends_on:
       - bot
     restart: unless-stopped
