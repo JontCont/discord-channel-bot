@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from '@tanstack/react-router'
-import { ArrowLeft, Check, Save, Settings2 } from 'lucide-react'
-import { useEffect } from 'react'
+import { ArrowLeft, Check, Save, Settings2, SquareTerminal } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { getGuildCategories, getGuildSettings, getGuilds, updateGuildSettings } from '../api'
@@ -14,6 +14,22 @@ import {
   type ValidSettingsFormValues,
 } from '../settings-form'
 import { ErrorState, LoadingState } from './States'
+
+const slashCommandGroups = [
+  { key: 'general', commands: ['/help [category]', '/userinfo [user]', '/announce <title> <content>'] },
+  { key: 'voice', commands: ['/voice-name <name>', '/voice-limit <limit>', '/voice-kick <user>', '/setup-voice', '/voice-invite <user>', '/setup-private', '/fix-private-perms'] },
+  { key: 'party', commands: ['/party setup', '/party create', '/party list'] },
+  { key: 'skills', commands: ['/skill create <name> [emoji]', '/skill delete <name>', '/skill join <invite-code>', '/skill leave <name>', '/skill info <name> [regenerate]', '/skill regen <name>', '/skill list', '/skill setup', '/skill panel'] },
+  { key: 'leveling', commands: ['/daily', '/rank [user]', '/leaderboard', '/level-preview', '/level-init'] },
+] as const
+
+const commandKey = (command: string) => {
+  const [root, subcommand] = command.replace(/^\//, '').split(' ')
+  const key = subcommand && !subcommand.startsWith('<') && !subcommand.startsWith('[')
+    ? `${root}_${subcommand}`
+    : root
+  return key!.replaceAll('-', '_')
+}
 
 type FieldProps = {
   label: string
@@ -146,8 +162,41 @@ function SettingsForm({ guildId }: { guildId: string }) {
   )
 }
 
+function SlashCommandGuide() {
+  const { t } = useTranslation()
+
+  return (
+    <div className="command-guide">
+      <div className="command-intro">
+        <SquareTerminal aria-hidden="true" />
+        <div>
+          <h2>{t('settings.slash.title')}</h2>
+          <p>{t('settings.slash.description')}</p>
+        </div>
+      </div>
+      {slashCommandGroups.map((group) => (
+        <section className="command-group" key={group.key} aria-labelledby={`command-group-${group.key}`}>
+          <div className="command-group-heading">
+            <h3 id={`command-group-${group.key}`}>{t(`settings.slash.groups.${group.key}`)}</h3>
+            <span>{t('settings.slash.commandCount', { count: group.commands.length })}</span>
+          </div>
+          <div className="command-list">
+            {group.commands.map((command) => (
+              <div className="command-row" key={command}>
+                <code>{command}</code>
+                <p>{t(`settings.slash.commands.${commandKey(command)}`)}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const { t } = useTranslation()
+  const [activeTab, setActiveTab] = useState<'settings' | 'slash'>('settings')
   const { guildId } = useParams({ from: '/authenticated/guilds/$guildId/settings' })
   const guilds = useQuery({ queryKey: ['guilds'], queryFn: getGuilds })
   const guild = guilds.data?.find((item) => item.id === guildId)
@@ -159,7 +208,20 @@ export function SettingsPage() {
         <div><p className="eyebrow">{t('settings.eyebrow')}</p><h1>{guild?.name ?? t('settings.fallbackServer')}</h1><p>{t('settings.description')}</p></div>
         <div className="heading-icon"><Settings2 aria-hidden="true" /></div>
       </div>
-      <SettingsForm guildId={guildId} />
+      <div className="settings-tabs" role="tablist" aria-label={t('settings.tabs.label')}>
+        <button type="button" role="tab" aria-selected={activeTab === 'settings'} aria-controls="settings-panel" id="settings-tab" onClick={() => setActiveTab('settings')}>
+          <Settings2 aria-hidden="true" /> {t('settings.tabs.settings')}
+        </button>
+        <button type="button" role="tab" aria-selected={activeTab === 'slash'} aria-controls="slash-panel" id="slash-tab" onClick={() => setActiveTab('slash')}>
+          <SquareTerminal aria-hidden="true" /> {t('settings.tabs.slash')}
+        </button>
+      </div>
+      <div role="tabpanel" id="settings-panel" aria-labelledby="settings-tab" hidden={activeTab !== 'settings'}>
+        <SettingsForm guildId={guildId} />
+      </div>
+      <div role="tabpanel" id="slash-panel" aria-labelledby="slash-tab" hidden={activeTab !== 'slash'}>
+        <SlashCommandGuide />
+      </div>
     </main>
   )
 }
