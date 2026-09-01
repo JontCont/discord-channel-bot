@@ -26,6 +26,15 @@
 - **私人包廂** — 加入「➕ 開設私人包廂」觸發頻道，自動建立上鎖的私人語音房。機器人會私訊密碼給房主，其他人需要在 `#🔑｜輸入密碼` 頻道輸入密碼才能進入。
 - **房主管理指令** — 改名、設人數上限、邀請或踢出成員。
 
+### 🎮 遊戲揪團大廳
+
+- **類別限制** — Web 後台可指定揪團功能使用的 Discord 類別；預設為「湯技：遊戲術 🎮」，新語音房也固定建立於此。
+- **固定互動面板** — 管理員執行一次 `/party setup`，成員之後可直接用按鈕建立或查看揪團。
+- **Discord 表單** — 填寫遊戲、標題、人數上限與備註後，自動建立公開動態語音房。
+- **即時房間列表** — 從下拉選單挑選揪團後，成員先加入任一語音頻道，再按下「進入揪團」，Bot 才會移入目標房間。
+- **自然語句入口** — 提及 Bot 並輸入 `create server`、`建立房間` 或 `建立揪團`，即可取得建立按鈕。
+- **自動清理** — 揪團房沒人後自動刪除，並透過持久化 registry 在 Bot 重啟後繼續追蹤。
+
 ### 🏷️ 湯技角色系統
 
 一鍵建立「湯技」技能角色，自動生成對應的分類、文字頻道和語音觸發器。成員可自由加入/離開；管理員可查看湯技角色名稱與邀請碼、發送互動面板，並可視需求重新產生邀請碼。
@@ -46,39 +55,56 @@
 
 ### 本機啟動
 
-```bash
-# 1. 建立虛擬環境
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS / Linux
+```powershell
+pnpm install
+Copy-Item .env.example .env
 
-# 2. 安裝套件
-pip install -r requirements.txt
+# Bot 與 OAuth/Settings API（port 8000）
+uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py
 
-# 3. 設定環境變數
-copy .env.example .env       # Windows
-# cp .env.example .env       # macOS / Linux
-# 編輯 .env 填入你的 Bot Token
-
-# 4. 啟動機器人
-python bot.py
+# 另一個終端啟動 Web（port 5173）
+pnpm nx run web:dev
 ```
 
-### Docker 啟動
+本機開發時，將 `DISCORD_REDIRECT_URI` 設為
+`http://localhost:5173/api/auth/callback`。正式環境必須使用 HTTPS，並設定
+`SESSION_COOKIE_SECURE=true`。
+
+```powershell
+# 驗證
+pnpm nx run bot:test
+pnpm nx run bot:compile
+pnpm nx run web:typecheck
+pnpm nx run web:build
+```
+
+### NAS Docker 啟動
+
+NAS 只需要 `docker-compose.yml` 與 `.env`，不需要上傳 source code。先建立
+`data`、`logs` 目錄，再拉取 GHCR images 並啟動：
 
 ```bash
-# 1. 設定環境變數
-copy .env.example .env
-# 編輯 .env 填入你的 Bot Token
+mkdir -p data logs
+docker compose pull
+docker compose up -d
+docker compose logs -f
+```
 
-# 2. 構建並啟動容器
-docker-compose up -d --build
+若 GHCR package 設為 private，請先登入：
 
-# 3. 查看日誌
-docker-compose logs -f
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
 
-# 4. 停止服務
-docker-compose down
+更新版本時再次執行 `docker compose pull` 與 `docker compose up -d`。預設使用
+`latest`，也可在 `.env` 以 `BOT_IMAGE`、`WEB_IMAGE` 指定固定版本。
+
+### 本機 Docker 建置
+
+完整 source code 環境可使用本機 Compose 自行建置 images：
+
+```powershell
+docker compose -f docker-compose.local.yml up -d --build
 ```
 
 ---
@@ -87,29 +113,22 @@ docker-compose down
 
 ```
 discord-channel-bot/
-├── bot.py                    # 主程式入口
-├── config.py                 # 環境變數設定
-├── cogs/
-│   ├── __init__.py
-│   ├── prefix/               # 前綴指令模組
-│   │   └── general.py        # 基本指令 (ping, info)
-│   ├── slash/                # 其他 Slash 指令模組
-│   │   ├── slash_commands.py # Slash 指令 (userinfo)
-│   │   ├── embeds.py         # Embed 訊息指令
-│   │   ├── auto_voice.py     # 公開自動語音頻道
-│   │   ├── private_room.py   # 私人包廂 & 密碼系統
-│   │   ├── skill_commands.py # 湯技角色系統
-│   │   └── leveling.py       # 活躍值等級系統
-│   ├── repository/           # 共用資料層
-│   │   ├── leveling_db.py    # 等級資料庫層 (SQLite)
-│   │   └── skill_invite_repository.py # 湯技邀請碼資料層
-│   └── service/              # 共用服務層
-│       ├── room_registry.py  # 語音房共享狀態管理
-│       └── skill_service.py  # 湯技規則與流程
+├── apps/
+│   ├── bot/
+│   │   ├── bot.py            # Bot 與 API 主程式入口
+│   │   ├── config.py         # Python 環境變數設定
+│   │   ├── cogs/             # Discord、API、資料與服務模組
+│   │   ├── tests/            # Bot/API 單元測試
+│   │   ├── requirements.txt  # Python dependencies
+│   │   ├── Dockerfile
+│   │   └── project.json      # Nx bot project
+│   └── web/                  # React/Vite 設定後台
 ├── data/                     # 資料目錄（等級資料庫）
-├── Dockerfile                # Docker 映像定義
+├── logs/                     # Bot runtime logs
 ├── docker-compose.yml        # Docker Compose 設定
-├── requirements.txt
+├── nx.json                   # Nx workspace 設定
+├── package.json              # pnpm/Nx root package
+├── pnpm-workspace.yaml
 ├── .env.example
 ├── .dockerignore
 └── .gitignore
@@ -124,6 +143,16 @@ discord-channel-bot/
 | 變數名稱 | 必填 | 預設值 | 說明 |
 |---|---|---|---|
 | `DISCORD_TOKEN` | ✅ | — | 你的 Discord Bot Token |
+| `DISCORD_CLIENT_ID` | Web 必填 | — | Discord OAuth client ID |
+| `DISCORD_CLIENT_SECRET` | Web 必填 | — | Discord OAuth client secret |
+| `DISCORD_REDIRECT_URI` | Web 必填 | — | Discord OAuth callback URL |
+| `WEB_BASE_URL` | — | `/` | OAuth 完成後導回的 Web URL |
+| `SESSION_COOKIE_SECURE` | — | `false` | HTTPS 正式環境應設為 `true` |
+| `SETTINGS_DB_PATH` | — | `data/settings.db` | Guild 動態設定資料庫 |
+| `API_HOST` | — | `0.0.0.0` | Settings API listen host |
+| `API_PORT` | — | `8000` | Settings API listen port |
+| `BOT_IMAGE` | — | `ghcr.io/jontcont/discord-channel-bot-bot:latest` | NAS 使用的 Bot image |
+| `WEB_IMAGE` | — | `ghcr.io/jontcont/discord-channel-bot-web:latest` | NAS 使用的 Web image |
 | `BOT_PREFIX` | — | `!` | 前綴指令符號 |
 | `LOG_LEVEL` | — | `INFO` | 日誌等級（DEBUG / INFO / WARNING / ERROR） |
 | `BOT_LANGUAGE` | — | `zh-TW` | 語系預設（如 `zh-TW` / `en-US`）。未自訂名稱時會套用對應語言預設值 |
@@ -190,6 +219,15 @@ discord-channel-bot/
 | `/voice-invite <使用者>` | 房主 | 邀請指定成員進入你目前所屬的私人語音包廂（免輸密碼） |
 | `/setup-private` | 管理頻道 | 建立私人包廂分類、密碼驗證頻道與包廂觸發語音頻道 |
 | `/fix-private-perms` | 管理頻道 | 修復所有現有私人包廂的權限（確保房主管理權與隔離設定） |
+
+### 遊戲揪團（slash/party.py）
+
+| 指令 | 權限需求 | 說明 |
+|---|---|---|
+| `/party setup` | 管理頻道 | 在目前文字頻道建立固定揪團面板 |
+| `/party create` | — | 直接開啟遊戲揪團表單 |
+| `/party list` | — | 查看進行中的揪團並選擇加入 |
+| `@Bot create server` | — | 以提及方式取得建立揪團按鈕 |
 
 ### 湯技角色系統（slash/skill_commands.py）
 

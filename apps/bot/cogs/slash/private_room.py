@@ -5,15 +5,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import (
-    PRIVATE_CATEGORY,
-    PRIVATE_TRIGGER,
-    PRIVATE_SUFFIX,
-    PRIVATE_LIMIT,
-    PASSWORD_CHANNEL,
-    LEVEL_ROLES,
-)
-
 
 def _generate_password(length: int = 6) -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
@@ -29,9 +20,13 @@ class PrivateRoom(commands.Cog):
     def registry(self):
         return self.bot.room_registry
 
-    def _iter_level_roles(self, guild: discord.Guild):
-        """Yield existing milestone roles configured in LEVEL_ROLES."""
-        for _, role_name, _ in LEVEL_ROLES:
+    def _iter_level_roles(
+        self,
+        guild: discord.Guild,
+        level_roles: tuple[tuple[int, str, int], ...],
+    ):
+        """Yield existing configured milestone roles."""
+        for _, role_name, _ in level_roles:
             role = discord.utils.get(guild.roles, name=role_name)
             if role is not None:
                 yield role
@@ -45,11 +40,16 @@ class PrivateRoom(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ):
+        settings = await self.bot.guild_settings_service.get(member.guild.id)
+
         # Private room trigger
-        if after.channel is not None and after.channel.name == PRIVATE_TRIGGER:
+        if (
+            after.channel is not None
+            and after.channel.name == settings.private_trigger
+        ):
             category = after.channel.category
             password = _generate_password()
-            channel_name = f"🔒 {member.display_name}{PRIVATE_SUFFIX}"
+            channel_name = f"🔒 {member.display_name}{settings.private_suffix}"
 
             # Lock the room by default, then explicitly grant the owner and bot access.
             overwrites = {
@@ -76,7 +76,7 @@ class PrivateRoom(commands.Cog):
 
             # Keep private rooms visible for leveling roles even if category denies them.
             # They still cannot join until invited/password grants member-specific permission.
-            for role in self._iter_level_roles(member.guild):
+            for role in self._iter_level_roles(member.guild, settings.level_roles):
                 overwrites[role] = discord.PermissionOverwrite(
                     connect=False,
                     view_channel=True,
@@ -85,7 +85,7 @@ class PrivateRoom(commands.Cog):
             new_channel = await member.guild.create_voice_channel(
                 name=channel_name,
                 category=category,
-                user_limit=PRIVATE_LIMIT,
+                user_limit=settings.private_limit,
                 overwrites=overwrites,
                 reason=f"Private room: created for {member}",
             )
@@ -100,7 +100,7 @@ class PrivateRoom(commands.Cog):
                     description=(
                         f"頻道：**{channel_name}**\n"
                         f"密碼：`{password}`\n\n"
-                        f"將密碼分享給朋友，他們可以在 **#{PASSWORD_CHANNEL}** 頻道輸入密碼加入！"
+                        f"將密碼分享給朋友，他們可以在 **#{settings.password_channel}** 頻道輸入密碼加入！"
                     ),
                     color=discord.Color.orange(),
                 )
@@ -115,7 +115,11 @@ class PrivateRoom(commands.Cog):
         """Listen for password input in the password channel."""
         if message.author.bot:
             return
-        if message.channel.name != PASSWORD_CHANNEL:
+        if message.guild is None:
+            return
+
+        settings = await self.bot.guild_settings_service.get(message.guild.id)
+        if message.channel.name != settings.password_channel:
             return
 
         entered = message.content.strip()
@@ -190,45 +194,48 @@ class PrivateRoom(commands.Cog):
     async def setup_private(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
 
-        category = discord.utils.get(guild.categories, name=PRIVATE_CATEGORY)
+        category = discord.utils.get(
+            guild.categories, name=settings.private_category
+        )
         if not category:
             category = await guild.create_category(
-                name=PRIVATE_CATEGORY,
+                name=settings.private_category,
                 reason=f"Private room setup by {interaction.user}",
             )
 
         results = []
 
         has_pw_channel = any(
-            ch.name == PASSWORD_CHANNEL for ch in category.text_channels
+            ch.name == settings.password_channel for ch in category.text_channels
         )
         if not has_pw_channel:
             await category.create_text_channel(
-                name=PASSWORD_CHANNEL,
+                name=settings.password_channel,
                 topic="輸入包廂密碼即可加入私人語音頻道",
                 reason=f"Private room setup by {interaction.user}",
             )
-            results.append(f"#{PASSWORD_CHANNEL}")
+            results.append(f"#{settings.password_channel}")
 
         password_channel = discord.utils.get(
             category.text_channels,
-            name=PASSWORD_CHANNEL,
+            name=settings.password_channel,
         )
 
         has_trigger = any(
-            ch.name == PRIVATE_TRIGGER for ch in category.voice_channels
+            ch.name == settings.private_trigger for ch in category.voice_channels
         )
         if not has_trigger:
             await category.create_voice_channel(
-                name=PRIVATE_TRIGGER,
+                name=settings.private_trigger,
                 reason=f"Private room setup by {interaction.user}",
             )
-            results.append(PRIVATE_TRIGGER)
+            results.append(settings.private_trigger)
 
         trigger_channel = discord.utils.get(
             category.voice_channels,
-            name=PRIVATE_TRIGGER,
+            name=settings.private_trigger,
         )
 
         # ── Fix visibility for @everyone and all existing level roles ──────────
@@ -260,7 +267,7 @@ class PrivateRoom(commands.Cog):
 
         # Also apply to any existing level roles (redundant but explicit)
         role_updates = 0
-        for role in self._iter_level_roles(guild):
+        for role in self._iter_level_roles(guild, settings.level_roles):
             await category.set_permissions(role, view_channel=True, reason=reason)
             role_updates += 1
             if password_channel is not None:
@@ -282,15 +289,17 @@ class PrivateRoom(commands.Cog):
 
         if results:
             msg = (
-                f"✅ 已在「{PRIVATE_CATEGORY}」建立：\n"
+                f"✅ 已在「{settings.private_category}」建立：\n"
                 + "\n".join(f"　• {r}" for r in results)
                 + f"\n\n{sync_note}"
             )
             await interaction.followup.send(msg)
-            await self._post_password_rules(guild)
+            await self._post_password_rules(
+                guild, settings.private_category, settings.password_channel
+            )
         else:
             await interaction.followup.send(
-                f"⏭️ 「{PRIVATE_CATEGORY}」分類和所有頻道已存在。\n{sync_note}"
+                f"⏭️ 「{settings.private_category}」分類和所有頻道已存在。\n{sync_note}"
             )
 
     def _build_password_rules_embed(self) -> discord.Embed:
@@ -324,15 +333,20 @@ class PrivateRoom(commands.Cog):
         embed.set_footer(text="💡 房主可透過 /voice-invite 直接邀請成員")
         return embed
 
-    async def _post_password_rules(self, guild: discord.Guild):
+    async def _post_password_rules(
+        self,
+        guild: discord.Guild,
+        private_category: str,
+        password_channel: str,
+    ):
         """Post or update the rules embed in the password channel."""
         for cat in guild.categories:
-            if cat.name == PRIVATE_CATEGORY:
+            if cat.name == private_category:
                 break
         else:
             return
 
-        channel = discord.utils.get(cat.text_channels, name=PASSWORD_CHANNEL)
+        channel = discord.utils.get(cat.text_channels, name=password_channel)
         if not channel:
             return
 
@@ -350,7 +364,10 @@ class PrivateRoom(commands.Cog):
     async def on_ready(self):
         """Post password rules embed on startup."""
         for guild in self.bot.guilds:
-            await self._post_password_rules(guild)
+            settings = await self.bot.guild_settings_service.get(guild.id)
+            await self._post_password_rules(
+                guild, settings.private_category, settings.password_channel
+            )
 
     # ── /fix-private-perms ──────────────────────────────────
     
@@ -362,11 +379,14 @@ class PrivateRoom(commands.Cog):
     async def fix_private_perms(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
         
-        category = discord.utils.get(guild.categories, name=PRIVATE_CATEGORY)
+        category = discord.utils.get(
+            guild.categories, name=settings.private_category
+        )
         if not category:
             await interaction.followup.send(
-                f"❌ 找不到「{PRIVATE_CATEGORY}」分類。請先執行 /setup-private。"
+                f"❌ 找不到「{settings.private_category}」分類。請先執行 /setup-private。"
             )
             return
         
@@ -376,7 +396,7 @@ class PrivateRoom(commands.Cog):
         
         for channel in category.voice_channels:
             # Skip trigger channel
-            if channel.name == PRIVATE_TRIGGER:
+            if channel.name == settings.private_trigger:
                 continue
             
             # Check if this is a private room (has lock emoji or is in registry)

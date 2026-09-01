@@ -2,7 +2,6 @@ import secrets
 
 import discord
 
-from config import AUTO_VOICE_TRIGGER, SKILL_PREFIX
 from cogs.repository.skill_invite_repository import SkillInviteRepository
 
 
@@ -14,13 +13,16 @@ class SkillService:
 
     @staticmethod
     def find_role(
-        guild: discord.Guild, name: str, emoji: str | None = None
+        guild: discord.Guild,
+        name: str,
+        skill_prefix: str,
+        emoji: str | None = None,
     ) -> discord.Role | None:
         name = name.strip()
-        candidates = {name, f"{SKILL_PREFIX}{name}"}
+        candidates = {name, f"{skill_prefix}{name}"}
         if emoji:
             candidates.add(f"{name} {emoji}")
-            candidates.add(f"{SKILL_PREFIX}{name} {emoji}")
+            candidates.add(f"{skill_prefix}{name} {emoji}")
 
         for role in guild.roles:
             if role.name.strip() in candidates:
@@ -28,40 +30,62 @@ class SkillService:
         return None
 
     @staticmethod
-    def find_category(guild: discord.Guild, name: str) -> discord.CategoryChannel | None:
-        target = f"{SKILL_PREFIX}{name}"
+    def find_category(
+        guild: discord.Guild, name: str, skill_prefix: str
+    ) -> discord.CategoryChannel | None:
+        target = f"{skill_prefix}{name}"
         for cat in guild.categories:
             if cat.name.startswith(target):
                 return cat
         return None
 
     @staticmethod
-    def skill_category_name(name: str, emoji: str | None = None) -> str:
+    def skill_category_name(
+        name: str, skill_prefix: str, emoji: str | None = None
+    ) -> str:
         if emoji:
-            return f"{SKILL_PREFIX}{name} {emoji}"
-        return f"{SKILL_PREFIX}{name}"
+            return f"{skill_prefix}{name} {emoji}"
+        return f"{skill_prefix}{name}"
 
     @staticmethod
-    def get_skills(guild: discord.Guild) -> list[tuple[str, str | None]]:
+    def get_skills(
+        guild: discord.Guild, skill_prefix: str
+    ) -> list[tuple[str, str | None]]:
         skills = []
         for cat in guild.categories:
-            if cat.name.startswith(SKILL_PREFIX):
-                rest = cat.name.removeprefix(SKILL_PREFIX).strip()
+            if cat.name.startswith(skill_prefix):
+                rest = cat.name.removeprefix(skill_prefix).strip()
                 parts = rest.split(" ", 1)
                 skill_name = parts[0].strip()
                 emoji = parts[1].strip() if len(parts) > 1 else None
                 skills.append((skill_name, emoji))
         return skills
 
+    @staticmethod
+    def filter_panel_skills(
+        skills: list[tuple[str, str | None]], configured_names: tuple[str, ...]
+    ) -> list[tuple[str, str | None]]:
+        available = {name.casefold(): (name, emoji) for name, emoji in skills}
+        return [
+            available[name.casefold()]
+            for name in configured_names
+            if name.casefold() in available
+        ]
+
     def build_panel_embed(
-        self, skills: list[tuple[str, str | None]], guild: discord.Guild
+        self,
+        skills: list[tuple[str, str | None]],
+        guild: discord.Guild,
+        skill_prefix: str,
+        direct_join_skills: tuple[str, ...],
     ) -> discord.Embed:
         lines = []
         for name, emoji in skills:
-            role = self.find_role(guild, name)
+            role = self.find_role(guild, name, skill_prefix, emoji)
             count = len(role.members) if role else 0
             prefix = f"{emoji} " if emoji else ""
-            lines.append(f"{prefix}**{name}** — {count} 位成員")
+            join_hint = "（按鈕可直接加入）" if name in direct_join_skills else "（需邀請碼）"
+            lines.append(f"{prefix}**{name}** — {count} 位成員 {join_hint}")
 
         embed = discord.Embed(
             title="🎯 選擇你的湯技",
@@ -71,7 +95,7 @@ class SkillService:
             ),
             color=discord.Color.blue(),
         )
-        embed.set_footer(text="💡 點擊按鈕即可直接加入 / 離開湯技身分組")
+        embed.set_footer(text="💡 指定湯技可直接加入；其餘請使用邀請碼。按鈕皆可離開")
         return embed
 
     @staticmethod
@@ -150,16 +174,14 @@ class SkillService:
             return code
         return self.set_invite_code(guild_id, skill_name)
 
-    def find_skill_by_code(self, guild: discord.Guild, code: str) -> tuple[str, discord.Role] | None:
+    def find_skill_by_code(
+        self, guild: discord.Guild, code: str, skill_prefix: str
+    ) -> tuple[str, discord.Role] | None:
         target = code.strip().upper()
-        for name, _emoji in self.get_skills(guild):
-            role = self.find_role(guild, name)
+        for name, emoji in self.get_skills(guild, skill_prefix):
+            role = self.find_role(guild, name, skill_prefix, emoji)
             if not role:
                 continue
             if self.get_invite_code(guild.id, name) == target:
                 return name, role
         return None
-
-    @property
-    def auto_voice_trigger(self) -> str:
-        return AUTO_VOICE_TRIGGER

@@ -2,12 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import (
-    AUTO_VOICE_TRIGGER,
-    SKILL_PANEL_CHANNEL,
-    SKILL_PREFIX,
-)
 from cogs.repository.skill_invite_repository import SkillInviteRepository
+from cogs.service.guild_settings_service import GuildSettings
 from cogs.service.skill_service import SkillService
 
 
@@ -16,6 +12,7 @@ class SkillToggleButton(discord.ui.Button):
 
     def __init__(
         self,
+        bot: commands.Bot,
         service: SkillService,
         skill_name: str,
         emoji: str | None = None,
@@ -26,14 +23,17 @@ class SkillToggleButton(discord.ui.Button):
             style=discord.ButtonStyle.secondary,
             custom_id=f"skill_toggle:{skill_name}",
         )
+        self._bot = bot
         self._service = service
         self.skill_name = skill_name
         self._emoji_str = emoji
 
     async def callback(self, interaction: discord.Interaction):
+        settings = await self._bot.guild_settings_service.get(interaction.guild_id)
         role = self._service.find_role(
             interaction.guild,
             self.skill_name,
+            settings.skill_prefix,
             self._emoji_str,
         )
         if not role:
@@ -42,20 +42,33 @@ class SkillToggleButton(discord.ui.Button):
             )
             return
 
-        try:
-            if role in interaction.user.roles:
+        if role in interaction.user.roles:
+            try:
                 await interaction.user.remove_roles(role, reason="Skill panel toggle")
                 await interaction.response.send_message(
                     f"👋 你已離開湯技 **{self.skill_name}**", ephemeral=True
                 )
-            else:
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "❌ 機器人權限不足或身分組順位過低，無法調整該身分組。", ephemeral=True
+                )
+        elif self.skill_name in settings.skill_panel_direct_join_skills:
+            try:
                 await interaction.user.add_roles(role, reason="Skill panel toggle")
                 await interaction.response.send_message(
                     f"✅ 你已加入湯技 **{self.skill_name}**", ephemeral=True
                 )
-        except discord.Forbidden:
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "❌ 機器人權限不足或身分組順位過低，無法調整該身分組。", ephemeral=True
+                )
+        else:
             await interaction.response.send_message(
-                "❌ 機器人權限不足或身分組順位過低，無法調整該身分組。", ephemeral=True
+                (
+                    f"🔐 **{self.skill_name}** 現在採邀請碼加入。\n"
+                    "請使用 `/skill join` 並輸入邀請碼。"
+                ),
+                ephemeral=True,
             )
 
 
@@ -64,6 +77,7 @@ class SkillPanelView(discord.ui.View):
 
     def __init__(
         self,
+        bot: commands.Bot,
         service: SkillService,
         skills: list[tuple[str, str | None]],
     ):
@@ -71,6 +85,7 @@ class SkillPanelView(discord.ui.View):
         for skill_name, emoji in skills:
             self.add_item(
                 SkillToggleButton(
+                    bot,
                     service,
                     skill_name,
                     emoji,
@@ -88,13 +103,31 @@ class SkillCommands(commands.GroupCog, name="skill"):
         self._panel_messages: dict[int, int] = {}
         super().__init__()
 
-    def _get_skills(self, guild: discord.Guild) -> list[tuple[str, str | None]]:
-        return self.skill_service.get_skills(guild)
+    def _get_skills(
+        self, guild: discord.Guild, settings: GuildSettings
+    ) -> list[tuple[str, str | None]]:
+        return self.skill_service.get_skills(guild, settings.skill_prefix)
+
+    def _get_panel_skills(
+        self, guild: discord.Guild, settings: GuildSettings
+    ) -> list[tuple[str, str | None]]:
+        return self.skill_service.filter_panel_skills(
+            self._get_skills(guild, settings),
+            settings.skill_panel_direct_join_skills,
+        )
 
     def _build_panel_embed(
-        self, skills: list[tuple[str, str | None]], guild: discord.Guild
+        self,
+        skills: list[tuple[str, str | None]],
+        guild: discord.Guild,
+        settings: GuildSettings,
     ) -> discord.Embed:
-        return self.skill_service.build_panel_embed(skills, guild)
+        return self.skill_service.build_panel_embed(
+            skills,
+            guild,
+            settings.skill_prefix,
+            settings.skill_panel_direct_join_skills,
+        )
 
     def _skill_overwrites(self, guild: discord.Guild, role: discord.Role) -> dict:
         return self.skill_service.skill_overwrites(guild, role)
@@ -107,18 +140,23 @@ class SkillCommands(commands.GroupCog, name="skill"):
     ):
         await self.skill_service.apply_skill_permissions(category, role, reason)
 
-    async def _refresh_panel(self, guild: discord.Guild):
+    async def _refresh_panel(
+        self, guild: discord.Guild, settings: GuildSettings | None = None
+    ):
         """Update or create the skill panel in #湯技 channel."""
-        channel = discord.utils.get(guild.text_channels, name=SKILL_PANEL_CHANNEL)
+        settings = settings or await self.bot.guild_settings_service.get(guild.id)
+        channel = discord.utils.get(
+            guild.text_channels, name=settings.skill_panel_channel
+        )
         if not channel:
             return
 
-        skills = self._get_skills(guild)
+        skills = self._get_panel_skills(guild, settings)
         if not skills:
             return
 
-        embed = self._build_panel_embed(skills, guild)
-        view = SkillPanelView(self.skill_service, skills)
+        embed = self._build_panel_embed(skills, guild, settings)
+        view = SkillPanelView(self.bot, self.skill_service, skills)
         self.bot.add_view(view)
 
         # Try to edit existing panel message
@@ -143,24 +181,31 @@ class SkillCommands(commands.GroupCog, name="skill"):
     async def on_ready(self):
         """Auto-post/update skill panel in #湯技 on startup."""
         for guild in self.bot.guilds:
-            skills = self._get_skills(guild)
+            settings = await self.bot.guild_settings_service.get(guild.id)
+            skills = self._get_panel_skills(guild, settings)
             if skills:
-                self.bot.add_view(SkillPanelView(self.skill_service, skills))
-            await self._refresh_panel(guild)
+                self.bot.add_view(SkillPanelView(self.bot, self.skill_service, skills))
+            await self._refresh_panel(guild, settings)
 
     # ── helpers ──────────────────────────────────────────────
 
     @staticmethod
-    def _skill_category_name(name: str, emoji: str | None = None) -> str:
-        return SkillService.skill_category_name(name, emoji)
+    def _skill_category_name(
+        name: str, skill_prefix: str, emoji: str | None = None
+    ) -> str:
+        return SkillService.skill_category_name(name, skill_prefix, emoji)
 
     @staticmethod
-    def _find_category(guild: discord.Guild, name: str) -> discord.CategoryChannel | None:
-        return SkillService.find_category(guild, name)
+    def _find_category(
+        guild: discord.Guild, name: str, skill_prefix: str
+    ) -> discord.CategoryChannel | None:
+        return SkillService.find_category(guild, name, skill_prefix)
 
     @staticmethod
-    def _find_role(guild: discord.Guild, name: str) -> discord.Role | None:
-        return SkillService.find_role(guild, name)
+    def _find_role(
+        guild: discord.Guild, name: str, skill_prefix: str
+    ) -> discord.Role | None:
+        return SkillService.find_role(guild, name, skill_prefix)
 
     @staticmethod
     def _auto_skill_role_color(name: str) -> discord.Colour:
@@ -180,10 +225,11 @@ class SkillCommands(commands.GroupCog, name="skill"):
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
         """Autocomplete for skill names based on existing categories."""
+        settings = await self.bot.guild_settings_service.get(interaction.guild_id)
         choices = []
         for cat in interaction.guild.categories:
-            if cat.name.startswith(SKILL_PREFIX):
-                skill_name = cat.name.removeprefix(SKILL_PREFIX).split(" ")[0]
+            if cat.name.startswith(settings.skill_prefix):
+                skill_name = cat.name.removeprefix(settings.skill_prefix).split(" ")[0]
                 if current.lower() in skill_name.lower():
                     choices.append(app_commands.Choice(name=skill_name, value=skill_name))
         return choices[:25]
@@ -207,16 +253,17 @@ class SkillCommands(commands.GroupCog, name="skill"):
     ):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
 
         # Check if skill already exists
-        if self._find_category(guild, name):
+        if self._find_category(guild, name, settings.skill_prefix):
             await interaction.followup.send(f"❌ 湯技 **{name}** 已經存在。")
             return
 
         # 1. Create role
         role_name = name.strip()
-        if not role_name.startswith(SKILL_PREFIX):
-            role_name = f"{SKILL_PREFIX}{role_name}"
+        if not role_name.startswith(settings.skill_prefix):
+            role_name = f"{settings.skill_prefix}{role_name}"
         role = await guild.create_role(
             name=role_name,
             colour=self._auto_skill_role_color(name),
@@ -226,7 +273,9 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
         # 2. Create category with permission overrides
         overwrites = self._skill_overwrites(guild, role)
-        category_name = self._skill_category_name(name, emoji)
+        category_name = self._skill_category_name(
+            name, settings.skill_prefix, emoji
+        )
         category = await guild.create_category(
             name=category_name,
             overwrites=overwrites,
@@ -238,7 +287,7 @@ class SkillCommands(commands.GroupCog, name="skill"):
         await category.create_text_channel(f"{name}-聊天")
 
         # 4. Create voice trigger channel
-        await category.create_voice_channel(AUTO_VOICE_TRIGGER)
+        await category.create_voice_channel(settings.auto_voice_trigger)
 
         invite_code = self.skill_service.set_invite_code(guild.id, name)
 
@@ -259,14 +308,14 @@ class SkillCommands(commands.GroupCog, name="skill"):
             f"　• 角色：{role.mention}\n"
             f"　• 分類：{category_name}\n"
             f"　• 頻道：{name}-討論（論壇）、#{name}-聊天\n"
-            f"　• 語音：{AUTO_VOICE_TRIGGER}\n"
+            f"　• 語音：{settings.auto_voice_trigger}\n"
             f"　• 邀請碼通知：{dm_status_text}"
         )
         if dm_failed:
             create_msg += f"\n　• 備援顯示邀請碼：`{invite_code}`"
 
         await interaction.followup.send(create_msg, ephemeral=True)
-        await self._refresh_panel(guild)
+        await self._refresh_panel(guild, settings)
 
     # ── /skill delete ────────────────────────────────────────
 
@@ -280,8 +329,9 @@ class SkillCommands(commands.GroupCog, name="skill"):
     async def skill_delete(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
 
-        category = self._find_category(guild, name)
+        category = self._find_category(guild, name, settings.skill_prefix)
         if not category:
             await interaction.followup.send(f"❌ 找不到湯技 **{name}**。")
             return
@@ -292,14 +342,14 @@ class SkillCommands(commands.GroupCog, name="skill"):
         await category.delete(reason=f"Skill delete by {interaction.user}")
 
         # Delete role
-        role = self._find_role(guild, name)
+        role = self._find_role(guild, name, settings.skill_prefix)
         if role:
             await role.delete(reason=f"Skill delete by {interaction.user}")
 
         self.skill_service.delete_invite_code(guild.id, name)
 
         await interaction.followup.send(f"✅ 湯技 **{name}** 已刪除（角色 + 分類 + 所有頻道）。")
-        await self._refresh_panel(guild)
+        await self._refresh_panel(guild, settings)
 
     # ── /skill join ──────────────────────────────────────────
 
@@ -310,7 +360,10 @@ class SkillCommands(commands.GroupCog, name="skill"):
     @app_commands.describe(code="湯技 8 碼專屬邀請碼")
     async def skill_join(self, interaction: discord.Interaction, code: str):
         guild = interaction.guild
-        matched = self.skill_service.find_skill_by_code(guild, code)
+        settings = await self.bot.guild_settings_service.get(guild.id)
+        matched = self.skill_service.find_skill_by_code(
+            guild, code, settings.skill_prefix
+        )
 
         if not matched:
             await interaction.response.send_message(
@@ -351,9 +404,10 @@ class SkillCommands(commands.GroupCog, name="skill"):
     ):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
 
-        category = self._find_category(guild, name)
-        role = self._find_role(guild, name)
+        category = self._find_category(guild, name, settings.skill_prefix)
+        role = self._find_role(guild, name, settings.skill_prefix)
 
         if not category and not role:
             await interaction.followup.send(f"❌ 找不到湯技 **{name}**。", ephemeral=True)
@@ -367,7 +421,9 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
         role_mention = role.mention if role else "（找不到對應角色）"
         role_name = role.name if role else "（找不到對應角色）"
-        category_name = category.name if category else f"{SKILL_PREFIX}{skill_name}"
+        category_name = (
+            category.name if category else f"{settings.skill_prefix}{skill_name}"
+        )
         regen_text = "（已重新產生）" if regenerate_invite else ""
 
         await interaction.followup.send(
@@ -391,8 +447,9 @@ class SkillCommands(commands.GroupCog, name="skill"):
     async def skill_regen(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
 
-        role = self._find_role(guild, name)
+        role = self._find_role(guild, name, settings.skill_prefix)
         if not role:
             await interaction.followup.send(f"❌ 找不到湯技角色 **{name}**。")
             return
@@ -412,7 +469,8 @@ class SkillCommands(commands.GroupCog, name="skill"):
     @app_commands.autocomplete(name=_skill_autocomplete)
     async def skill_leave(self, interaction: discord.Interaction, name: str):
         guild = interaction.guild
-        role = self._find_role(guild, name)
+        settings = await self.bot.guild_settings_service.get(guild.id)
+        role = self._find_role(guild, name, settings.skill_prefix)
 
         if not role:
             await interaction.response.send_message(
@@ -439,10 +497,13 @@ class SkillCommands(commands.GroupCog, name="skill"):
     )
     async def skill_list(self, interaction: discord.Interaction):
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
         skills = []
 
-        for skill_name, emoji in self._get_skills(guild):
-            role = self.skill_service.find_role(guild, skill_name, emoji)
+        for skill_name, emoji in self._get_skills(guild, settings):
+            role = self.skill_service.find_role(
+                guild, skill_name, settings.skill_prefix, emoji
+            )
             member_count = len(role.members) if role else 0
             prefix = f"{emoji} " if emoji else ""
             skills.append(f"• {prefix}**{skill_name}** — {member_count} 位成員")
@@ -468,19 +529,22 @@ class SkillCommands(commands.GroupCog, name="skill"):
     async def skill_setup(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        settings = await self.bot.guild_settings_service.get(guild.id)
         results = []
 
         for cat in guild.categories:
-            if not cat.name.startswith(SKILL_PREFIX):
+            if not cat.name.startswith(settings.skill_prefix):
                 continue
 
-            skill_display = cat.name.removeprefix(SKILL_PREFIX)
+            skill_display = cat.name.removeprefix(settings.skill_prefix)
             parts = skill_display.strip().split(" ", 1)
             skill_name = parts[0].strip()
             skill_emoji = parts[1].strip() if len(parts) > 1 else None
             added = []
 
-            role = self.skill_service.find_role(guild, skill_name, skill_emoji)
+            role = self.skill_service.find_role(
+                guild, skill_name, settings.skill_prefix, skill_emoji
+            )
             if role:
                 await self._apply_skill_permissions(
                     cat,
@@ -520,11 +584,11 @@ class SkillCommands(commands.GroupCog, name="skill"):
 
             # Check and create missing voice trigger
             has_voice_trigger = any(
-                ch.name == AUTO_VOICE_TRIGGER for ch in cat.voice_channels
+                ch.name == settings.auto_voice_trigger for ch in cat.voice_channels
             )
             if not has_voice_trigger:
-                await cat.create_voice_channel(AUTO_VOICE_TRIGGER)
-                added.append(AUTO_VOICE_TRIGGER)
+                await cat.create_voice_channel(settings.auto_voice_trigger)
+                added.append(settings.auto_voice_trigger)
 
             if added:
                 results.append(f"**{skill_display}**：{', '.join(added)}")
@@ -545,16 +609,18 @@ class SkillCommands(commands.GroupCog, name="skill"):
     @app_commands.checks.has_permissions(manage_roles=True)
     async def skill_panel(self, interaction: discord.Interaction):
         guild = interaction.guild
-        skills = self._get_skills(guild)
+        settings = await self.bot.guild_settings_service.get(guild.id)
+        skills = self._get_panel_skills(guild, settings)
 
         if not skills:
             await interaction.response.send_message(
-                "❌ 目前沒有任何湯技，請先使用 `/skill create` 建立。", ephemeral=True
+                "❌ 面板設定中沒有可用的湯技，請先在 Web 後台設定面板顯示清單。",
+                ephemeral=True,
             )
             return
 
-        embed = self._build_panel_embed(skills, guild)
-        view = SkillPanelView(self.skill_service, skills)
+        embed = self._build_panel_embed(skills, guild, settings)
+        view = SkillPanelView(self.bot, self.skill_service, skills)
         await interaction.channel.send(embed=embed, view=view)
         await interaction.response.send_message("✅ 湯技面板已發送！", ephemeral=True)
 

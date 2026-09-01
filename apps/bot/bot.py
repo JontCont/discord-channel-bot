@@ -1,9 +1,22 @@
 import asyncio
 import logging
 import discord
+import uvicorn
 from discord.ext import commands
 
-from config import DISCORD_TOKEN, BOT_PREFIX, GUILD_ID, AUTO_VOICE_TRIGGER, PRIVATE_TRIGGER
+from cogs.api import create_api
+from cogs.repository.guild_settings_db import GuildSettingsDB
+from cogs.service.guild_settings_service import GuildSettingsService
+from config import (
+    API_HOST,
+    API_PORT,
+    AUTO_VOICE_TRIGGER,
+    BOT_PREFIX,
+    DISCORD_TOKEN,
+    GUILD_ID,
+    PRIVATE_TRIGGER,
+    SETTINGS_DB_PATH,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,6 +41,7 @@ COGS = [
     "cogs.slash.auto_voice",
     "cogs.slash.private_room",
     "cogs.slash.skill_commands",
+    "cogs.slash.party",
     "cogs.slash.leveling",
     "cogs.slash.help",
 ]
@@ -74,14 +88,29 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError):
 
 async def main():
     _validate_config()
+    settings_db = GuildSettingsDB(SETTINGS_DB_PATH)
+    await settings_db.init()
+    bot.guild_settings_service = GuildSettingsService(settings_db)
+
+    api = create_api(bot.guild_settings_service, bot)
+    api_server = uvicorn.Server(
+        uvicorn.Config(api, host=API_HOST, port=API_PORT, log_level="info")
+    )
+    api_task = asyncio.create_task(api_server.serve())
+
     async with bot:
-        for cog in COGS:
-            try:
-                await bot.load_extension(cog)
-                logger.info("Loaded cog: %s", cog)
-            except Exception:
-                logger.exception("Failed to load cog: %s", cog)
-        await bot.start(DISCORD_TOKEN)
+        try:
+            for cog in COGS:
+                try:
+                    await bot.load_extension(cog)
+                    logger.info("Loaded cog: %s", cog)
+                except Exception:
+                    logger.exception("Failed to load cog: %s", cog)
+            await bot.start(DISCORD_TOKEN)
+        finally:
+            api_server.should_exit = True
+            await api_task
+            await settings_db.close()
 
 
 if __name__ == "__main__":
