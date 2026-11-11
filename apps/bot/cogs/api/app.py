@@ -8,8 +8,12 @@ from typing import Any, Callable, Mapping, Protocol
 from urllib.parse import urlencode
 
 import httpx
+import discord as discord_api
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+from cogs.service.guild_settings_service import GuildSettingsService
+from cogs.slash.party import PartyCommands
+from cogs.slash.skill_commands import SkillCommands
 
 
 logger = logging.getLogger(__name__)
@@ -431,6 +435,27 @@ def create_api(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=str(exc),
             ) from None
+        if set(changes) & (GuildSettingsService.PANEL_TEXT_LIMITS.keys() | {
+            "skill_panel_channel", "skill_panel_direct_join_skills",
+        }):
+            guild = discord_bot.get_guild(guild_id)
+            channel = discord_api.utils.get(guild.text_channels, name=settings.skill_panel_channel)
+            if channel is None:
+                logger.warning("Settings saved but community panel channel is missing in guild %s", guild_id)
+            else:
+                try:
+                    skill_cog = discord_bot.get_cog("skill")
+                    party_cog = discord_bot.get_cog("party")
+                    if not isinstance(skill_cog, SkillCommands) or not isinstance(party_cog, PartyCommands):
+                        raise RuntimeError("Community panel commands are not ready.")
+                    await skill_cog._refresh_panel(guild, settings)
+                    await party_cog._refresh_panel(channel)
+                except (discord_api.HTTPException, ValueError, RuntimeError) as exc:
+                    logger.exception("Settings saved but panel refresh failed in guild %s", guild_id)
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail=f"Settings were saved, but Discord panels could not be fully updated: {exc}",
+                    ) from None
         return {"settings": settings.to_dict()}
 
     return app

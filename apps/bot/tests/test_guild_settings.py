@@ -70,6 +70,39 @@ class GuildSettingsServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(settings.xp_per_message_max, 8)
         self.assertEqual(settings.private_limit, config.PRIVATE_LIMIT)
 
+    async def test_panel_text_is_persisted_per_guild_and_footer_can_be_hidden(self):
+        await self.service.update(40, {
+            "party_panel_title": "Community lobby",
+            "party_panel_description": "Choose a room.\n**Welcome!**",
+            "party_panel_create_label": "New room",
+            "skill_panel_title": "Choose interests",
+            "skill_panel_footer": "",
+        })
+        saved = await GuildSettingsService(self.db).get(40)
+        self.assertEqual(saved.party_panel_title, "Community lobby")
+        self.assertEqual(saved.party_panel_description, "Choose a room.\n**Welcome!**")
+        self.assertEqual(saved.party_panel_create_label, "New room")
+        self.assertEqual(saved.skill_panel_title, "Choose interests")
+        self.assertEqual(saved.skill_panel_footer, "")
+        self.assertEqual((await self.service.get(41)).party_panel_title, GuildSettings().party_panel_title)
+
+    async def test_panel_text_limits_match_discord_and_reject_without_persisting(self):
+        await self.service.update(50, {"party_panel_title": "x" * 256, "party_panel_create_label": "x" * 80})
+        for changes in (
+            {"party_panel_title": "x" * 257},
+            {"party_panel_create_label": "x" * 81},
+            {"skill_panel_description": "x" * 4097},
+            {"skill_panel_footer": "x" * 2049},
+            {"party_panel_list_description": "   "},
+            {"skill_panel_footer": None},
+            {"party_panel_description": "x" * 4096,
+             "party_panel_create_description": "x" * 1024,
+             "party_panel_list_description": "x" * 1024},
+        ):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                await self.service.update(51, changes)
+        self.assertEqual(await self.db.get_all(51), {})
+
     async def test_legacy_party_skill_is_read_as_party_category(self):
         await self.db.set_many(21, {"party_skill": "遊戲術"})
 

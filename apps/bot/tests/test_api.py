@@ -1,6 +1,8 @@
 import importlib.util
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -14,11 +16,15 @@ if HAS_API_DEPENDENCIES:
 
     from cogs.api import ApiConfig, create_api
     from cogs.api.app import SESSION_COOKIE
+    from cogs.slash.party import PartyCommands
+    from cogs.slash.skill_commands import SkillCommands
 
 
 @dataclass
 class FakeSettings:
     auto_voice_limit: int = 8
+    skill_panel_channel: str = "skills"
+    skill_panel_title: str = "Skills"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -31,7 +37,8 @@ class FakeSettings:
             "private_limit": 5,
             "password_channel": "passwords",
             "skill_prefix": "!",
-            "skill_panel_channel": "skills",
+            "skill_panel_channel": self.skill_panel_channel,
+            "skill_panel_title": self.skill_panel_title,
             "skill_panel_direct_join_skills": ["Music"],
             "party_category": "Gaming",
             "xp_per_message_min": 1,
@@ -56,7 +63,7 @@ class FakeSettingsService:
     async def update(
         self, guild_id: int, changes: dict[str, Any]
     ) -> FakeSettings:
-        unknown = set(changes) - {"auto_voice_limit"}
+        unknown = set(changes) - {"auto_voice_limit", "skill_panel_title"}
         if unknown:
             raise ValueError(f"unknown setting keys: {', '.join(sorted(unknown))}")
         settings = await self.get(guild_id)
@@ -64,6 +71,8 @@ class FakeSettingsService:
             if type(changes["auto_voice_limit"]) is not int:
                 raise ValueError("auto_voice_limit must be an integer")
             settings.auto_voice_limit = changes["auto_voice_limit"]
+        if "skill_panel_title" in changes:
+            settings.skill_panel_title = changes["skill_panel_title"]
         self.updates.append((guild_id, dict(changes)))
         return settings
 
@@ -77,10 +86,12 @@ class FakeCategory:
 @dataclass
 class FakeGuild:
     categories: list[FakeCategory]
+    text_channels: list[Any] = field(default_factory=list)
 
 
 class FakeBot:
     def __init__(self, guild_ids: set[int]):
+        self.cogs: dict[str, Any] = {}
         self.guilds = {
             guild_id: FakeGuild(
                 categories=[
@@ -93,6 +104,9 @@ class FakeBot:
 
     def get_guild(self, guild_id: int) -> FakeGuild | None:
         return self.guilds.get(guild_id)
+
+    def get_cog(self, name: str):
+        return self.cogs.get(name)
 
 
 @unittest.skipUnless(HAS_API_DEPENDENCIES, "FastAPI and HTTPX are not installed")
@@ -155,9 +169,10 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             transport=httpx.MockTransport(discord_handler)
         )
         self.settings_service = FakeSettingsService()
+        self.bot = FakeBot({100, 200, 300})
         self.app = create_api(
             self.settings_service,
-            FakeBot({100, 200, 300}),
+            self.bot,
             config=ApiConfig(
                 client_id="client-id",
                 client_secret="client-secret",
@@ -211,6 +226,46 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             manageable["icon_url"],
             "https://cdn.discordapp.com/icons/100/iconhash.webp?size=96",
         )
+
+    async def test_panel_copy_update_refreshes_both_existing_panels(self):
+        self.authenticate()
+        skill = Mock(spec=SkillCommands)
+        skill._refresh_panel = AsyncMock()
+        party = Mock(spec=PartyCommands)
+        party._refresh_panel = AsyncMock()
+        self.bot.cogs = {"skill": skill, "party": party}
+        guild = self.bot.get_guild(100)
+        channel = SimpleNamespace(name="skills")
+        guild.text_channels = [channel]
+        response = await self.client.put(
+            "/api/guilds/100/settings", json={"skill_panel_title": "My interests"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["settings"]["skill_panel_title"], "My interests")
+        skill._refresh_panel.assert_awaited_once()
+        party._refresh_panel.assert_awaited_once_with(channel)
+
+    async def test_failed_panel_refresh_reports_saved_settings_and_retries(self):
+        self.authenticate()
+        skill = Mock(spec=SkillCommands)
+        skill._refresh_panel = AsyncMock()
+        party = Mock(spec=PartyCommands)
+        party._refresh_panel = AsyncMock(side_effect=RuntimeError("Panel unavailable"))
+        self.bot.cogs = {"skill": skill, "party": party}
+        self.bot.get_guild(100).text_channels = [SimpleNamespace(name="skills")]
+        with self.assertLogs("cogs.api.app", level="ERROR"):
+            failed = await self.client.put(
+                "/api/guilds/100/settings", json={"skill_panel_title": "My interests"},
+            )
+        self.assertEqual(failed.status_code, 502)
+        self.assertIn("Settings were saved", failed.json()["detail"])
+        self.assertEqual((await self.settings_service.get(100)).skill_panel_title, "My interests")
+        party._refresh_panel.side_effect = None
+        retried = await self.client.put(
+            "/api/guilds/100/settings", json={"skill_panel_title": "My interests"},
+        )
+        self.assertEqual(retried.status_code, 200)
+        self.assertEqual(party._refresh_panel.await_count, 2)
 
     async def test_settings_get_and_update_revalidate_authorization(self):
         self.authenticate()

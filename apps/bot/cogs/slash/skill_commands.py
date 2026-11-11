@@ -126,6 +126,7 @@ class SkillCommands(commands.GroupCog, name="skill"):
             guild,
             settings.skill_prefix,
             settings.skill_panel_direct_join_skills,
+            settings=settings,
         )
 
     def _skill_overwrites(self, guild: discord.Guild, role: discord.Role) -> dict:
@@ -158,7 +159,9 @@ class SkillCommands(commands.GroupCog, name="skill"):
         view = SkillPanelView(self.bot, self.skill_service, skills)
         self.bot.add_view(view)
 
-        await upsert_panel(self.bot, channel, embed, view)
+        await upsert_panel(
+            self.bot, channel, embed, view, component_prefix="skill_toggle:",
+        )
 
     @commands.Cog.listener()
     async def on_ready(self):

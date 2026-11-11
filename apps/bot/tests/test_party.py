@@ -6,11 +6,13 @@ import discord
 
 import config
 from cogs.service.panel_service import upsert_panel
+from cogs.service.guild_settings_service import GuildSettings
 from cogs.slash.party import (
     PartyCommands,
     PartyCreateModal,
     PartyCreatedView,
     PartyJoinConfirmView,
+    PartyPanelView,
     _open_party_modal,
     _require_party_access,
     _send_party_list,
@@ -24,12 +26,13 @@ async def _messages(items):
 
 class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.settings = SimpleNamespace(
-            skill_panel_channel="🎯｜社群入口",
-            party_category="湯技：遊戲術 🎮",
-            skill_prefix="湯技：",
-            private_category="🔒 私人湯",
-        )
+        self.settings = SimpleNamespace(**{
+            **GuildSettings().to_dict(),
+            "skill_panel_channel": "🎯｜社群入口",
+            "party_category": "湯技：遊戲術 🎮",
+            "skill_prefix": "湯技：",
+            "private_category": "🔒 私人湯",
+        })
         self.permissions = SimpleNamespace(
             view_channel=True, connect=True, send_messages=True, embed_links=True,
             manage_channels=True,
@@ -502,6 +505,21 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
             await cog._refresh_panel(self.entry)
         self.general.create_text_channel.assert_awaited_once()
 
+    async def test_panel_uses_saved_titles_instructions_and_button_labels(self):
+        self.settings.party_panel_title = "Custom lobby"
+        self.settings.party_panel_create_heading = "Start here"
+        self.settings.party_panel_create_description = "Choose a category."
+        self.settings.party_panel_create_label = "Create now"
+        self.settings.party_panel_list_label = "Browse now"
+        with patch("cogs.slash.party.upsert_panel", new_callable=AsyncMock) as upsert:
+            await PartyCommands(self.bot)._refresh_panel(self.entry)
+        embed = upsert.call_args.args[2]
+        view = upsert.call_args.args[3]
+        self.assertEqual(embed.title, "Custom lobby")
+        self.assertEqual(embed.fields[0].name, "Start here")
+        self.assertEqual(embed.fields[0].value, "Choose a category.")
+        self.assertEqual([item.label for item in view.children], ["Create now", "Browse now"])
+
     async def test_missing_community_entry_reports_partial_setup(self):
         self.guild.text_channels = []
         with (
@@ -514,6 +532,44 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SharedPanelTests(unittest.IsolatedAsyncioTestCase):
+    async def test_title_changes_reuse_the_same_panel_by_component_identity(self):
+        bot = Mock()
+        existing = Mock(spec=discord.Message)
+        existing.author = bot.user
+        existing.embeds = [discord.Embed(title="Old custom title")]
+        existing.components = [discord.ActionRow({
+            "type": 1,
+            "components": [{"type": 2, "style": 1, "label": "Create", "custom_id": "party:create"}],
+        })]
+        existing.pinned = True
+        existing.edit = AsyncMock()
+        unrelated = Mock(spec=discord.Message)
+        unrelated.author = bot.user
+        unrelated.embeds = [discord.Embed(title="New title")]
+        unrelated.components = [discord.ActionRow({
+            "type": 1,
+            "components": [{"type": 2, "style": 2, "label": "Music", "custom_id": "skill_toggle:Music"}],
+        })]
+        channel = Mock(spec=discord.TextChannel)
+        channel.pins.side_effect = lambda: _messages([unrelated, existing])
+        channel.send = AsyncMock()
+        for title in ("New title", "Another title"):
+            await upsert_panel(
+                bot, channel, discord.Embed(title=title), PartyPanelView(bot),
+                component_prefix="party:",
+            )
+        self.assertEqual(existing.edit.await_count, 2)
+        unrelated.edit.assert_not_called()
+        channel.send.assert_not_awaited()
+
+    async def test_rejects_dynamic_description_overflow_before_discord_request(self):
+        channel = Mock(spec=discord.TextChannel)
+        with self.assertRaisesRegex(ValueError, "exceeds Discord"):
+            await upsert_panel(
+                Mock(), channel, discord.Embed(description="x" * 4097), discord.ui.View(),
+            )
+        channel.pins.assert_not_called()
+
     async def test_reuses_old_pinned_panel_without_deleting_other_panels(self):
         bot = Mock()
         existing = Mock(spec=discord.Message)

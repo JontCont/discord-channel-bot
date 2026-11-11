@@ -11,9 +11,25 @@ async def upsert_panel(
     view: discord.ui.View,
     *,
     previous_titles: tuple[str, ...] = (),
+    component_prefix: str | None = None,
 ) -> discord.Message:
+    if len(embed.description or "") > 4096 or len(embed) > 6000:
+        raise ValueError("Panel text, including dynamic skill rows, exceeds Discord embed limits.")
+
     def matches(message: discord.Message) -> bool:
-        return message.author == bot.user and any(
+        if message.author != bot.user:
+            return False
+        if component_prefix:
+            ids = [
+                component.custom_id
+                for row in message.components
+                if isinstance(row, discord.ActionRow)
+                for component in row.children
+                if isinstance(component, (discord.Button, discord.SelectMenu)) and component.custom_id
+            ]
+            if ids:
+                return any(custom_id.startswith(component_prefix) for custom_id in ids)
+        return any(
             item.title in (embed.title, *previous_titles) for item in message.embeds
         )
 

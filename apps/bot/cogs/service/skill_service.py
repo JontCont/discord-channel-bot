@@ -3,6 +3,7 @@ import secrets
 import discord
 
 from cogs.repository.skill_invite_repository import SkillInviteRepository
+from cogs.service.guild_settings_service import GuildSettings
 
 
 class SkillService:
@@ -78,7 +79,10 @@ class SkillService:
         guild: discord.Guild,
         skill_prefix: str,
         direct_join_skills: tuple[str, ...],
+        *,
+        settings: GuildSettings | None = None,
     ) -> discord.Embed:
+        settings = settings or GuildSettings()
         lines = []
         for name, emoji in skills:
             role = self.find_role(guild, name, skill_prefix, emoji)
@@ -88,20 +92,12 @@ class SkillService:
             lines.append(f"{prefix}**{name}** — {count} 位成員 {join_hint}")
 
         embed = discord.Embed(
-            title="🎯 選擇你的湯技",
-            description=(
-                "「湯技」就是這裡的**興趣分組**，幫你找到有共同興趣的同好。\n"
-                "加入後會取得對應身分組，並看見該分組的聊天、討論與語音頻道。\n\n"
-                "**怎麼加入？**\n"
-                "選擇感興趣的湯技，點下方按鈕即可加入，**可以同時加入多個**。\n"
-                "已加入的湯技再點一次就會離開，並收起對應的專屬頻道。\n\n"
-                + "\n".join(lines)
-            ),
+            title=settings.skill_panel_title,
+            description=settings.skill_panel_description + "\n\n" + "\n".join(lines),
             color=discord.Color.blue(),
         )
-        embed.set_footer(
-            text="💡 其餘湯技需向邀請人取得邀請碼，再使用 /skill join 加入。"
-        )
+        if settings.skill_panel_footer:
+            embed.set_footer(text=settings.skill_panel_footer)
         return embed
 
     @staticmethod

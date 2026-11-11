@@ -123,6 +123,9 @@ function SettingsForm({ guildId }: { guildId: string }) {
           <Field label={t('settings.fields.commandPrefix')} error={inputError('skill_prefix')}><input {...form.register('skill_prefix')} /></Field>
           <Field label={t('settings.fields.panelChannel')} error={inputError('skill_panel_channel')}><input {...form.register('skill_panel_channel')} /></Field>
           <Field label={t('settings.fields.directJoinSkills')} hint={t('settings.hints.directJoinSkills')} error={inputError('skill_panel_direct_join_skills')}><textarea rows={5} {...form.register('skill_panel_direct_join_skills')} /></Field>
+          <Field label={t('settings.fields.panelTitle')} error={inputError('skill_panel_title')}><input maxLength={256} {...form.register('skill_panel_title')} /></Field>
+          <Field label={t('settings.fields.panelDescription')} hint={t('settings.hints.skillPanelDescription')} error={inputError('skill_panel_description')}><textarea rows={8} maxLength={4096} {...form.register('skill_panel_description')} /></Field>
+          <Field label={t('settings.fields.panelFooter')} hint={t('settings.hints.panelFooter')} error={inputError('skill_panel_footer')}><textarea rows={3} maxLength={2048} {...form.register('skill_panel_footer')} /></Field>
           <Field label={t('settings.fields.partyCategory')} hint={t('settings.hints.partyCategory')} error={inputError('party_category')}>
             <select {...form.register('party_category')} disabled={categories.isLoading}>
               {categories.isLoading && <option value={selectedPartyCategory}>{t('settings.status.loadingCategories')}</option>}
@@ -131,6 +134,20 @@ function SettingsForm({ guildId }: { guildId: string }) {
             </select>
             {categories.isError && <span className="field-error" role="alert">{categories.error.message}</span>}
           </Field>
+        </div>
+      </section>
+
+      <section className="settings-section" aria-labelledby="room-panel-title">
+        <div className="section-heading"><h2 id="room-panel-title">{t('settings.sections.roomPanel.title')}</h2><p>{t('settings.sections.roomPanel.description')}</p></div>
+        <div className="form-grid">
+          <Field label={t('settings.fields.panelTitle')} error={inputError('party_panel_title')}><input maxLength={256} {...form.register('party_panel_title')} /></Field>
+          <Field label={t('settings.fields.panelDescription')} hint={t('settings.hints.panelDescription')} error={inputError('party_panel_description')}><textarea rows={6} maxLength={4096} {...form.register('party_panel_description')} /></Field>
+          <Field label={t('settings.fields.createHeading')} error={inputError('party_panel_create_heading')}><input maxLength={256} {...form.register('party_panel_create_heading')} /></Field>
+          <Field label={t('settings.fields.createDescription')} error={inputError('party_panel_create_description')}><textarea rows={3} maxLength={1024} {...form.register('party_panel_create_description')} /></Field>
+          <Field label={t('settings.fields.listHeading')} error={inputError('party_panel_list_heading')}><input maxLength={256} {...form.register('party_panel_list_heading')} /></Field>
+          <Field label={t('settings.fields.listDescription')} error={inputError('party_panel_list_description')}><textarea rows={3} maxLength={1024} {...form.register('party_panel_list_description')} /></Field>
+          <Field label={t('settings.fields.createButton')} error={inputError('party_panel_create_label')}><input maxLength={80} {...form.register('party_panel_create_label')} /></Field>
+          <Field label={t('settings.fields.listButton')} error={inputError('party_panel_list_label')}><input maxLength={80} {...form.register('party_panel_list_label')} /></Field>
         </div>
       </section>
 

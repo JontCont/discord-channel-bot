@@ -1,15 +1,35 @@
 import unittest
-from types import SimpleNamespace
 from unittest.mock import Mock
 
+import discord
 from cogs.repository.skill_invite_repository import SkillInviteRepository
 from cogs.service.skill_service import SkillService
+from cogs.service.guild_settings_service import GuildSettings
 
 
 class SkillServiceTests(unittest.TestCase):
+    def test_custom_panel_copy_preserves_dynamic_skill_counts_and_optional_footer(self):
+        service = SkillService(repo=Mock(spec=SkillInviteRepository))
+        guild = Mock(spec=discord.Guild)
+        guild.roles = []
+        embed = service.build_panel_embed(
+            [("Music", None)], guild, "Skill:", ("Music",),
+            settings=GuildSettings(
+                skill_panel_title="Interests",
+                skill_panel_description="**Join us!**",
+                skill_panel_footer="",
+            ),
+        )
+        self.assertEqual(embed.title, "Interests")
+        self.assertTrue(embed.description.startswith("**Join us!**"))
+        self.assertIn("Music", embed.description)
+        self.assertIn("0 位成員", embed.description)
+        self.assertIsNone(embed.footer.text)
+
     def test_panel_explains_purpose_access_and_toggle_behavior(self):
         service = SkillService(repo=Mock(spec=SkillInviteRepository))
-        guild = SimpleNamespace(roles=[])
+        guild = Mock(spec=discord.Guild)
+        guild.roles = []
         embed = service.build_panel_embed(
             [("遊戲術", "🎮")], guild, "湯技：", ("遊戲術",)
         )

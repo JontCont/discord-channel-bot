@@ -23,6 +23,28 @@ class GuildSettings:
         config.SKILL_PANEL_DIRECT_JOIN_SKILLS
     )
     party_category: str = config.PARTY_CATEGORY
+    party_panel_title: str = "🏠 房間大廳"
+    party_panel_description: str = (
+        "想聊天、玩遊戲或找同好？選擇分類就能建立公開語音房，不必先加入遊戲湯技。\n"
+        "表單填寫房名、人數、備註，並可多選自己已加入的湯技作為通知身分。\n"
+        "建立後由你決定是否分享，還可指定自己與 Bot 都能發文的文字頻道。\n"
+        "不分享就不發通知；所有人離開後自動清理房間。"
+    )
+    party_panel_create_heading: str = "建立房間"
+    party_panel_create_description: str = "選擇建立分類，填寫房名、人數、備註與通知身分（可多選）。"
+    party_panel_list_heading: str = "查看房間"
+    party_panel_list_description: str = "先加入任一語音頻道，再從即時列表選擇揪團，Bot 會直接移動你。"
+    party_panel_create_label: str = "建立房間"
+    party_panel_list_label: str = "查看房間"
+    skill_panel_title: str = "🎯 選擇你的湯技"
+    skill_panel_description: str = (
+        "「湯技」就是這裡的**興趣分組**，幫你找到有共同興趣的同好。\n"
+        "加入後會取得對應身分組，並看見該分組的聊天、討論與語音頻道。\n\n"
+        "**怎麼加入？**\n"
+        "選擇感興趣的湯技，點下方按鈕即可加入，**可以同時加入多個**。\n"
+        "已加入的湯技再點一次就會離開，並收起對應的專屬頻道。"
+    )
+    skill_panel_footer: str = "💡 其餘湯技需向邀請人取得邀請碼，再使用 /skill join 加入。"
 
     xp_per_message_min: int = config.XP_PER_MESSAGE_MIN
     xp_per_message_max: int = config.XP_PER_MESSAGE_MAX
@@ -43,6 +65,19 @@ class GuildSettings:
 
 
 class GuildSettingsService:
+    PANEL_TEXT_LIMITS = {
+        "party_panel_title": 256,
+        "party_panel_description": 4096,
+        "party_panel_create_heading": 256,
+        "party_panel_create_description": 1024,
+        "party_panel_list_heading": 256,
+        "party_panel_list_description": 1024,
+        "party_panel_create_label": 80,
+        "party_panel_list_label": 80,
+        "skill_panel_title": 256,
+        "skill_panel_description": 4096,
+        "skill_panel_footer": 2048,
+    }
     _FIELD_NAMES = frozenset(field.name for field in fields(GuildSettings))
     _REQUIRED_NAMES = frozenset(
         {
@@ -129,6 +164,26 @@ class GuildSettingsService:
 
     @classmethod
     def _validate(cls, settings: GuildSettings) -> None:
+        for name, maximum in cls.PANEL_TEXT_LIMITS.items():
+            value = getattr(settings, name)
+            if not isinstance(value, str) or name != "skill_panel_footer" and not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+            if len(value) > maximum:
+                raise ValueError(f"{name} must not exceed {maximum} characters")
+        party_text = (
+            settings.party_panel_title,
+            settings.party_panel_description,
+            settings.party_panel_create_heading,
+            settings.party_panel_create_description,
+            settings.party_panel_list_heading,
+            settings.party_panel_list_description,
+        )
+        if sum(map(len, party_text)) > 6000:
+            raise ValueError("room panel text must not exceed 6000 characters in total")
+        if sum(map(len, (
+            settings.skill_panel_title, settings.skill_panel_description, settings.skill_panel_footer,
+        ))) > 6000:
+            raise ValueError("skill panel text must not exceed 6000 characters in total")
         for name in cls._REQUIRED_NAMES:
             value = getattr(settings, name)
             if not isinstance(value, str) or not value.strip():

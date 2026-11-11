@@ -9,6 +9,7 @@ from discord.ext import commands
 
 import config
 from cogs.service.panel_service import upsert_panel
+from cogs.service.guild_settings_service import GuildSettings
 from cogs.service.skill_service import SkillService
 
 
@@ -693,9 +694,10 @@ async def _send_party_list(bot: commands.Bot, interaction: discord.Interaction):
         if _can_join(room[0], interaction.user)
     ]
     if not rooms:
+        settings = await bot.guild_settings_service.get(guild.id)
         await interaction.response.send_message(
             "目前沒有進行中的揪團。你可以建立第一個！",
-            view=PartyPanelView(bot),
+            view=PartyPanelView(bot, settings),
             ephemeral=True,
         )
         return
@@ -724,9 +726,12 @@ async def _send_party_list(bot: commands.Bot, interaction: discord.Interaction):
 
 
 class PartyPanelView(discord.ui.View):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot, settings: GuildSettings | None = None):
         super().__init__(timeout=None)
         self.bot = bot
+        settings = settings or GuildSettings()
+        self.create_party.label = settings.party_panel_create_label
+        self.list_parties.label = settings.party_panel_list_label
 
     @discord.ui.button(
         label="建立房間",
@@ -788,9 +793,10 @@ class PartyCommands(commands.GroupCog, name="party"):
             return
         if not isinstance(message.channel, discord.TextChannel):
             return
+        settings = await self.bot.guild_settings_service.get(message.guild.id)
         await message.reply(
             "🏠 點擊下方按鈕選擇分類並建立房間。",
-            view=PartyPanelView(self.bot),
+            view=PartyPanelView(self.bot, settings),
             mention_author=False,
         )
 
@@ -816,28 +822,24 @@ class PartyCommands(commands.GroupCog, name="party"):
                 channel.guild.id,
             )
         embed = discord.Embed(
-            title="🏠 房間大廳",
-            description=(
-                "想聊天、玩遊戲或找同好？選擇分類就能建立公開語音房，不必先加入遊戲湯技。\n"
-                "表單填寫房名、人數、備註，並可多選自己已加入的湯技作為通知身分。\n"
-                "建立後由你決定是否分享，還可指定自己與 Bot 都能發文的文字頻道。\n"
-                "不分享就不發通知；所有人離開後自動清理房間。"
-            ),
+            title=settings.party_panel_title,
+            description=settings.party_panel_description,
             color=discord.Color.blue(),
         )
         embed.add_field(
-            name="建立房間",
-            value="選擇建立分類，填寫房名、人數、備註與通知身分（可多選）。",
+            name=settings.party_panel_create_heading,
+            value=settings.party_panel_create_description,
             inline=False,
         )
         embed.add_field(
-            name="查看房間",
-            value="先加入任一語音頻道，再從即時列表選擇揪團，Bot 會直接移動你。",
+            name=settings.party_panel_list_heading,
+            value=settings.party_panel_list_description,
             inline=False,
         )
         await upsert_panel(
-            self.bot, channel, embed, PartyPanelView(self.bot),
+            self.bot, channel, embed, PartyPanelView(self.bot, settings),
             previous_titles=("🎮 遊戲揪團大廳",),
+            component_prefix="party:",
         )
         return entry is not None and entry.category is not None
 
