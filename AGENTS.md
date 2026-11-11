@@ -2,7 +2,8 @@
 
 - Every non-merge commit must update the latest entry in `changes.md`, including documentation-only commits.
 - Use the repository `update-changes` skill before preparing a commit.
-- Keep entries newest first, using `## YYYY-MM-DD - Summary`.
+- Keep entries newest first, using `## YYYY-MM-DD - Build NN - Summary`.
+- Use the user's local date. Number each day's records from `00`, incrementing for new entries and resetting to `00` on the next date. Preserve prior entries and numbering; rerunning CI does not create a record.
 - Group items under `### feature`, `### bug`, `### chore`, `### docs`, `### refactor`, or `### test`. Use only relevant categories, without duplicates or empty groups.
 - Each category must contain at least one non-empty `- ` item. Classify bug fixes only when the fixed behavior is verified.
 - Describe only verified changes. Never include secrets, webhook URLs, or private runtime data.

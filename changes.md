@@ -1,10 +1,27 @@
 # Changes
 
 每個非 merge commit 都必須更新最上方的最新紀錄；舊紀錄依時間由新到舊保留。
-每筆紀錄使用 `## 日期 - 摘要`，再依 `feature`、`bug`、`chore`、`docs`、
+每筆紀錄使用 `## 日期 - NN - 摘要`；同一天從 `00` 遞增，隔天重新從 `00`
+開始，最新紀錄放最上方。編號跟隨更新紀錄，重跑 CI 不新增編號。
+再依 `feature`、`bug`、`chore`、`docs`、
 `refactor`、`test` 分類。分類使用 `### 分類`，只保留有內容的分類。
 
-## 2026-11-11 - CI/CD 部署與更新紀錄
+## 2026-11-11 - 01 - 分開呈現 API 與 Web 建置部署節點
+
+### chore
+
+- 將 Actions matrix 群組改成 API Build → API Deploy 與 Web Build → Web Deploy 兩條分支。
+- 將 Python CI 收進 API Build，沿用既有 Bot/API image，Web 不等待 API 建置或部署。
+- 分別以共用 workflow 維護建置與部署，四個節點在主 workflow 明確連線。
+- 通知匯整兩條分支的結果，未受影響的 skipped 分支不會被誤判為失敗。
+- 通知會反映個別建置與部署結果，只列出成功推送的映像，不會把未建置的映像誤列為成功。
+- 更新紀錄加入每日從 00 開始的流水號，CI 檢查日期排序與編號連續性。
+
+### docs
+
+- 說明 Actions 分支圖與共用 workflow，維持原有的 Secret 設定方式。
+
+## 2026-11-11 - 00 - CI/CD 部署與更新紀錄
 
 ### feature
 

@@ -134,9 +134,24 @@ Pipeline 依變更檔案選擇建置目標：
 - `apps/web/**` 或 Web 共用建置設定（`package.json`、pnpm lockfile/workspace、
   `nx.json`、`tsconfig.base.json`、`.dockerignore`）：只建置 Web，不執行 Bot CI。
 - `apps/bot/**`：只執行 Bot CI 並建置 Bot。
-- 兩邊都有變更或修改 `.github/workflows/cicd.yml`：建置兩個 image。
+- 兩邊都有變更或修改 `.github/workflows/cicd.yml`／`build-image.yml`／
+  `deploy-image.yml`：建置兩個 image。
 - 純文件等不影響上述路徑的變更：略過 Bot CI、image 建置與部署，仍檢查更新紀錄。
 - 手動執行與版本標籤：保留完整建置兩個 image 的行為。
+
+Actions 圖表會明確顯示兩條分支：
+
+- **API**：變更偵測 → API Build → API Deploy。
+- **Web**：變更偵測 → Web Build → Web Deploy。
+- API Build 內含 Python CI，使用既有的 Bot/API image；Web 不等待 API。
+- 最後匯合 Discord 通知；未受影響的分支會標示 skipped。
+
+[`cicd.yml`](.github/workflows/cicd.yml) 負責分流，
+[`build-image.yml`](.github/workflows/build-image.yml) 與
+[`deploy-image.yml`](.github/workflows/deploy-image.yml) 分別維護共用建置與部署邏輯。
+四個 Build／Deploy job 在主 workflow 明確連線，不是兩個獨立的 push pipeline。
+`DEPLOY_WEBHOOK_URL` 在部署 workflow 最上方的 `env` 宣告，
+仍只需設定同一個 Repository Secret。
 
 CI/CD 在預設分支的 `latest` image 成功推送至 GHCR 後，會分別 POST 至
 `${DEPLOY_WEBHOOK_URL}/:project`（自動處理基底網址末尾的 `/`）：
@@ -156,10 +171,13 @@ Pull Request 與版本標籤建置不會觸發部署 webhook；手動執行預�
 ### 每次提交的更新紀錄
 
 每個新進的非 merge commit（包含純文件修改）都必須更新
-[`changes.md`](changes.md) 最上方的最新紀錄。使用 `## YYYY-MM-DD - 摘要`
+[`changes.md`](changes.md) 最上方的最新紀錄。使用 `## YYYY-MM-DD - Build NN - 摘要`
 作為標題，再用 `### feature`、`### bug`、`### chore`、`### docs`、
 `### refactor`、`### test` 分組。只保留有內容的分類，每個分類至少一個非空的
 `- ` 項目，不能重複分類；舊紀錄保留在下方。
+同一天從 `Build 00`、`Build 01` 依序編號，隔天重設為 `Build 00`，最新放在最上方。
+日期依使用者本地日期填寫；編號跟隨更新紀錄，不是 `github.run_number`，重跑 CI
+不會新增編號。CI 會檢查日期排序、編號重複及缺號。
 原有的 [`CHANGELOG.md`](CHANGELOG.md) 保留為歷史版本日誌。
 
 CI 會逐一檢查 push／Pull Request 範圍內的非 merge commit；沒有更新檔案、

@@ -1,13 +1,39 @@
 import argparse
+import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 
 CATEGORIES = {"feature", "bug", "chore", "docs", "refactor", "test"}
 
 
-def latest_entry(text: str) -> str:
+def validate_build_numbers(text: str) -> None:
+    headers = [line for line in text.splitlines() if line.startswith("## ")]
+    if not headers:
+        raise ValueError("changes.md must contain a latest entry starting with '## '.")
+    counts: dict[date, int] = {}
+    records: list[tuple[date, int]] = []
+    for header in headers:
+        match = re.fullmatch(r"## (\d{4}-\d{2}-\d{2}) - (\d{2,}) - (\S.*)", header)
+        if not match:
+            raise ValueError("Record headings must use '## YYYY-MM-DD - Build NN - Summary'.")
+        day = date.fromisoformat(match[1])
+        number = int(match[2])
+        if match[2] != f"{number:02d}":
+            raise ValueError("Build numbers must use two digits, expanding after 99.")
+        if records and day > records[-1][0]:
+            raise ValueError("Change records must be ordered newest date first.")
+        records.append((day, number))
+        counts[day] = counts.get(day, 0) + 1
+    for day, number in records:
+        counts[day] -= 1
+        if number != counts[day]:
+            raise ValueError(f"{day}: build numbers must start at 00 and increase without gaps or duplicates.")
+
+
+def _categorized_entry(text: str) -> str:
     entry: list[str] = []
     for line in text.splitlines():
         if line.startswith("## "):
@@ -44,6 +70,11 @@ def latest_entry(text: str) -> str:
     return "\n".join(entry).strip()
 
 
+def latest_entry(text: str) -> str:
+    validate_build_numbers(text)
+    return _categorized_entry(text)
+
+
 def git(repo: Path, *args: str) -> str:
     return subprocess.run(
         ["git", *args],
@@ -78,7 +109,8 @@ def validate_commits(repo: Path, base: str, head: str) -> int:
             current = latest_entry(git(repo, "show", f"{commit}:changes.md"))
             parents = git(repo, "show", "-s", "--format=%P", commit).split()
             if parents and git(repo, "ls-tree", "--name-only", parents[0], "--", "changes.md").strip():
-                previous = latest_entry(git(repo, "show", f"{parents[0]}:changes.md"))
+                # Previous commits may predate build numbering.
+                previous = _categorized_entry(git(repo, "show", f"{parents[0]}:changes.md"))
                 if current == previous:
                     errors.append(f"{label}: the latest changes.md entry was not updated.")
         except ValueError as error:
