@@ -18,7 +18,7 @@ def validate_build_numbers(text: str) -> None:
     for header in headers:
         match = re.fullmatch(r"## (\d{4}-\d{2}-\d{2}) - (\d{2,}) - (\S.*)", header)
         if not match:
-            raise ValueError("Record headings must use '## YYYY-MM-DD - Build NN - Summary'.")
+            raise ValueError("Record headings must use '## YYYY-MM-DD - NN - Summary'.")
         day = date.fromisoformat(match[1])
         number = int(match[2])
         if match[2] != f"{number:02d}":

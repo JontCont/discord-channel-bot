@@ -12,7 +12,7 @@ description: Prepare or repair changes.md records when committing changes, writi
 3. Use the user's local date. For a new entry, find the highest number already recorded for that date and add one; if no entry exists for that date, start at `00`. Keep at least two digits (`00`, `01`, ..., `99`, `100`). Add the entry at the top of the records in `changes.md`, after the introduction:
 
    ```markdown
-   ## YYYY-MM-DD - Build 00 - Short summary
+   ## YYYY-MM-DD - 00 - Short summary
 
    ### feature
 
@@ -35,6 +35,6 @@ description: Prepare or repair changes.md records when committing changes, writi
 ## Notification contract
 
 - The first `## ` section is the latest record. The next `## ` starts an older record.
-- Every record uses `## YYYY-MM-DD - Build NN - Summary`. Dates are newest first; each date's numbers are contiguous from `00`, with the largest number first. Numbering resets on each date, independently of `github.run_number`.
+- Every record uses `## YYYY-MM-DD - NN - Summary`, without a `Build` prefix. Dates are newest first; each date's numbers are contiguous from `00`, with the largest number first. Numbering resets on each date, independently of `github.run_number`.
 - The latest record must have a non-empty title and at least one supported `### category` heading with non-empty `- ` items. Ungrouped items, unknown categories, duplicate categories, and empty groups fail CI.
 - Discord reads only this latest section. CI never calls an AI service or writes commits automatically.

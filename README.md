@@ -171,11 +171,11 @@ Pull Request 與版本標籤建置不會觸發部署 webhook；手動執行預�
 ### 每次提交的更新紀錄
 
 每個新進的非 merge commit（包含純文件修改）都必須更新
-[`changes.md`](changes.md) 最上方的最新紀錄。使用 `## YYYY-MM-DD - Build NN - 摘要`
+[`changes.md`](changes.md) 最上方的最新紀錄。使用 `## YYYY-MM-DD - NN - 摘要`（不加 `Build`）
 作為標題，再用 `### feature`、`### bug`、`### chore`、`### docs`、
 `### refactor`、`### test` 分組。只保留有內容的分類，每個分類至少一個非空的
 `- ` 項目，不能重複分類；舊紀錄保留在下方。
-同一天從 `Build 00`、`Build 01` 依序編號，隔天重設為 `Build 00`，最新放在最上方。
+同一天從 `00`、`01` 依序編號，隔天重設為 `00`，最新放在最上方。
 日期依使用者本地日期填寫；編號跟隨更新紀錄，不是 `github.run_number`，重跑 CI
 不會新增編號。CI 會檢查日期排序、編號重複及缺號。
 原有的 [`CHANGELOG.md`](CHANGELOG.md) 保留為歷史版本日誌。
