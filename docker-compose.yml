@@ -1,0 +1,19 @@
+services:
+  bot:
+    image: ${BOT_IMAGE:-ghcr.io/jontcont/discord-channel-bot-bot:latest}
+    container_name: discord-channel-bot
+    env_file: ${COMPOSE_SERVICE_ENV_FILE:-.env}
+    restart: unless-stopped
+    expose:
+      - "8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/jontcont/discord-channel-bot-web:latest}
+    depends_on:
+      - bot
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"

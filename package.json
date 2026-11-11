@@ -1,0 +1,16 @@
+{
+  "name": "bot",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.3",
+  "scripts": {
+    "nx": "nx",
+    "serve": "nx run bot:serve",
+    "test": "nx run bot:test",
+    "compile": "nx run bot:compile",
+    "graph": "nx graph"
+  },
+  "devDependencies": {
+    "nx": "23.1.3"
+  }
+}

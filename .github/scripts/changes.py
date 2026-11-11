@@ -1,0 +1,118 @@
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+
+CATEGORIES = {"feature", "bug", "chore", "docs", "refactor", "test"}
+
+
+def latest_entry(text: str) -> str:
+    entry: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if entry:
+                break
+            entry.append(line)
+        elif entry:
+            entry.append(line)
+
+    if not entry or not entry[0][3:].strip():
+        raise ValueError("changes.md must contain a latest entry starting with '## '.")
+    category: str | None = None
+    has_item = False
+    seen: set[str] = set()
+    for line in entry[1:]:
+        if line.startswith("### "):
+            if category and not has_item:
+                raise ValueError(f"Category '{category}' must contain a non-empty '- ' item.")
+            category = line[4:].strip()
+            if category not in CATEGORIES:
+                raise ValueError(f"Unsupported changes.md category: '{category}'.")
+            if category in seen:
+                raise ValueError(f"Duplicate changes.md category: '{category}'.")
+            seen.add(category)
+            has_item = False
+        elif line.startswith("- ") and line[2:].strip():
+            if category is None:
+                raise ValueError("Change items must appear under a '### category' heading.")
+            has_item = True
+    if category is None:
+        raise ValueError("The latest changes.md entry must contain a '### category' heading.")
+    if not has_item:
+        raise ValueError(f"Category '{category}' must contain a non-empty '- ' item.")
+    return "\n".join(entry).strip()
+
+
+def git(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout
+
+
+def validate_commits(repo: Path, base: str, head: str) -> int:
+    if not base or set(base) == {"0"}:
+        commits = git(repo, "rev-list", "--max-count=1", "--no-merges", head).splitlines()
+    else:
+        commits = git(repo, "rev-list", "--reverse", "--no-merges", f"{base}..{head}").splitlines()
+
+    errors: list[str] = []
+    for commit in commits:
+        label = commit[:12]
+        changed = git(
+            repo, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", commit, "--", "changes.md"
+        ).splitlines()
+        if "changes.md" not in changed:
+            errors.append(f"{label}: changes.md was not updated.")
+            continue
+        if not git(repo, "ls-tree", "--name-only", commit, "--", "changes.md").strip():
+            errors.append(f"{label}: changes.md must not be deleted.")
+            continue
+
+        try:
+            current = latest_entry(git(repo, "show", f"{commit}:changes.md"))
+            parents = git(repo, "show", "-s", "--format=%P", commit).split()
+            if parents and git(repo, "ls-tree", "--name-only", parents[0], "--", "changes.md").strip():
+                previous = latest_entry(git(repo, "show", f"{parents[0]}:changes.md"))
+                if current == previous:
+                    errors.append(f"{label}: the latest changes.md entry was not updated.")
+        except ValueError as error:
+            errors.append(f"{label}: {error}")
+
+    if errors:
+        raise ValueError(
+            "\n".join(errors)
+            + "\nUse the update-changes skill to prepare the missing records."
+            + "\nRepairing existing commits requires explicit permission to rewrite history."
+        )
+    return len(commits)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Read and validate per-commit change records.")
+    parser.add_argument("command", choices=["latest", "check"])
+    parser.add_argument("--base", default="")
+    parser.add_argument("--head", default="HEAD")
+    args = parser.parse_args()
+    try:
+        latest = latest_entry(Path("changes.md").read_text(encoding="utf-8"))
+        if args.command == "latest":
+            print(latest)
+        else:
+            count = validate_commits(Path.cwd(), args.base, args.head)
+            print(f"Validated changes.md updates in {count} non-merge commit(s).")
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"Change record validation failed: {error}", file=sys.stderr)
+        if isinstance(error, subprocess.CalledProcessError) and error.stderr:
+            print(error.stderr.strip(), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
