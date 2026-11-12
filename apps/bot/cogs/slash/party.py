@@ -177,148 +177,43 @@ class VoiceChannelLinkView(discord.ui.View):
         )
 
 
-class ShareChannelSelect(discord.ui.ChannelSelect):
-    def __init__(self):
-        super().__init__(
-            placeholder="選填：指定分享頻道（預設揪團通知）",
-            channel_types=[discord.ChannelType.text],
-            min_values=0,
-            max_values=1,
+async def _announce_party(
+    bot: commands.Bot,
+    guild: discord.Guild,
+    member: discord.Member,
+    channel: discord.VoiceChannel,
+    party: dict[str, Any],
+    roles: list[discord.Role],
+) -> str:
+    """Post the new room to the notification channel and return a status line."""
+    destination = await _notification_channel(bot, guild)
+    if destination is None:
+        return "⚠️ 找不到揪團通知頻道，未發送通知；請管理員執行 /party setup。"
+    if guild.me is None:
+        logger.error("Bot member is unavailable in guild %s", guild.id)
+        return "⚠️ 無法確認 Bot 的頻道權限，未發送通知。"
+    bot_permissions = destination.permissions_for(guild.me)
+    if not (
+        bot_permissions.view_channel
+        and bot_permissions.send_messages
+        and bot_permissions.embed_links
+    ):
+        return "⚠️ Bot 需要通知頻道的檢視、傳送訊息與嵌入連結權限，未發送通知。"
+    try:
+        await destination.send(
+            content=" ".join(role.mention for role in roles) or None,
+            embed=_party_embed(channel, member, party),
+            view=VoiceChannelLinkView(channel),
+            allowed_mentions=discord.AllowedMentions(
+                everyone=False, users=False, roles=roles, replied_user=False
+            ),
         )
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-
-
-class PartyCreatedView(VoiceChannelLinkView):
-    def __init__(
-        self,
-        bot: commands.Bot,
-        channel: discord.VoiceChannel,
-        owner_id: int,
-    ):
-        super().__init__(channel)
-        self.timeout = 300
-        self.bot = bot
-        self.channel_id = channel.id
-        self.owner_id = owner_id
-        self.channel_select = ShareChannelSelect()
-        self.add_item(self.channel_select)
-        self._shared = False
-        self._lock = asyncio.Lock()
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id == self.owner_id:
-            return True
-        await interaction.response.send_message(
-            "🚫 只有房主可以分享這個房間。", ephemeral=True
+    except (discord.Forbidden, discord.HTTPException):
+        logger.warning(
+            "Failed to announce party room in guild %s", guild.id, exc_info=True
         )
-        return False
-
-    @discord.ui.button(label="分享房間", emoji="📣", style=discord.ButtonStyle.primary)
-    async def share(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        guild = interaction.guild
-        member = interaction.user
-        if (
-            guild is None
-            or not isinstance(member, discord.Member)
-            or member.id != self.owner_id
-        ):
-            await interaction.response.send_message(
-                "🚫 只有房主可以分享這個房間。", ephemeral=True
-            )
-            return
-        await interaction.response.defer(ephemeral=True)
-        async with self._lock:
-            if self._shared:
-                await interaction.followup.send("此房間已分享。", ephemeral=True)
-                return
-            channel = guild.get_channel(self.channel_id)
-            info = self.bot.room_registry.get(self.channel_id)
-            if (
-                not isinstance(channel, discord.VoiceChannel)
-                or not info
-                or info.get("owner") != member.id
-                or not isinstance(info.get("party"), dict)
-            ):
-                await interaction.followup.send(
-                    "⚠️ 房間已結束，或你已不是房主。", ephemeral=True
-                )
-                return
-            selected = {str(role_id) for role_id in info["party"].get("notify_role_ids", [])}
-            roles = [
-                role for role in await _shareable_roles(self.bot, member)
-                if str(role.id) in selected
-            ]
-            if selected != {str(role.id) for role in roles}:
-                await interaction.followup.send(
-                    "🚫 你已不具備表單中選取的湯技身分，無法標記分享。", ephemeral=True
-                )
-                return
-            if self.channel_select.values:
-                channel_id = self.channel_select.values[0].id
-                destination = guild.get_channel(channel_id)
-                if destination is None:
-                    destination = await guild.fetch_channel(channel_id)
-            else:
-                destination = await _notification_channel(self.bot, guild)
-            if destination is None:
-                await interaction.followup.send(
-                    "❌ 找不到揪團通知頻道，請管理員執行 /party setup。", ephemeral=True
-                )
-                return
-            if (
-                not isinstance(destination, discord.TextChannel)
-                or destination.guild.id != guild.id
-            ):
-                await interaction.followup.send(
-                    "🚫 請選擇同一伺服器的文字頻道。", ephemeral=True
-                )
-                return
-            permissions = destination.permissions_for(member)
-            if not permissions.view_channel or not permissions.send_messages:
-                await interaction.followup.send(
-                    "🚫 你沒有在指定文字頻道發文的權限。", ephemeral=True
-                )
-                return
-            if guild.me is None:
-                logger.error("Bot member is unavailable in guild %s", guild.id)
-                await interaction.followup.send(
-                    "❌ 無法確認 Bot 的頻道權限，請稍後重試。", ephemeral=True
-                )
-                return
-            bot_permissions = destination.permissions_for(guild.me)
-            if not (
-                bot_permissions.view_channel
-                and bot_permissions.send_messages
-                and bot_permissions.embed_links
-            ):
-                await interaction.followup.send(
-                    "❌ Bot 需要指定頻道的檢視、傳送訊息與嵌入連結權限。", ephemeral=True
-                )
-                return
-            await destination.send(
-                content=" ".join(role.mention for role in roles) or None,
-                embed=_party_embed(channel, member, info["party"]),
-                view=VoiceChannelLinkView(channel),
-                allowed_mentions=discord.AllowedMentions(
-                    everyone=False, users=False, roles=roles, replied_user=False
-                ),
-            )
-            self._shared = True
-            button.disabled = True
-            self.channel_select.disabled = True
-            await interaction.edit_original_response(view=self)
-            await interaction.followup.send(
-                f"✅ 已分享到 {destination.mention}。", ephemeral=True
-            )
-
-    async def on_error(
-        self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item
-    ):
-        await _report_party_error(interaction, error)
+        return "⚠️ 通知發送失敗，請確認 Bot 的頻道權限。"
+    return f"📣 已通知到 {destination.mention}。"
 
 
 class PartyJoinConfirmView(discord.ui.View):
@@ -454,7 +349,7 @@ class PartyCreateModal(discord.ui.Modal, title="建立房間"):
         self.add_item(discord.ui.Label(text="備註", component=self.note))
         self.add_item(discord.ui.Label(
             text="通知身分",
-            description="只列已加入湯技（最多前 25 個），可多選或不選；分享後才通知。",
+            description="只列已加入湯技（最多前 25 個），可多選或不選；送出後立即通知。",
             component=self.notify_roles,
         ))
 
@@ -575,10 +470,11 @@ class PartyCreateModal(discord.ui.Modal, title="建立房間"):
                     "Party room created but failed to move member %s", member.id, exc_info=True
                 )
         status = "✅ 已建立揪團並將你移入語音房。" if moved else "✅ 已建立揪團，請開啟語音房加入。"
+        notice = await _announce_party(self.bot, guild, member, channel, party, roles)
         await interaction.followup.send(
-            status + "\n想邀請同好時再按「分享房間」；不分享就不發通知。",
+            f"{status}\n{notice}",
             embed=_party_embed(channel, member, party),
-            view=PartyCreatedView(self.bot, channel, member.id),
+            view=VoiceChannelLinkView(channel),
             ephemeral=True,
         )
 
@@ -812,7 +708,7 @@ class PartyCommands(commands.GroupCog, name="party"):
             if notification is None:
                 await entry.category.create_text_channel(
                     config.PARTY_NOTIFICATION_CHANNEL,
-                    topic="房主自願分享的房間通知；只能標記自己已加入的湯技。",
+                    topic="新建房間的自動通知；只會標記房主已加入的湯技。",
                     reason="Community room notifications setup",
                 )
         else:

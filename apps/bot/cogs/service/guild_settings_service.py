@@ -27,8 +27,8 @@ class GuildSettings:
     party_panel_description: str = (
         "想聊天、玩遊戲或找同好？選擇分類就能建立公開語音房，不必先加入遊戲湯技。\n"
         "表單填寫房名、人數、備註，並可多選自己已加入的湯技作為通知身分。\n"
-        "建立後由你決定是否分享，還可指定自己與 Bot 都能發文的文字頻道。\n"
-        "不分享就不發通知；所有人離開後自動清理房間。"
+        "送出表單後，Bot 會自動在揪團通知頻道公告，並標記你選的湯技身分。\n"
+        "所有人離開後自動清理房間。"
     )
     party_panel_create_heading: str = "建立房間"
     party_panel_create_description: str = "選擇建立分類，填寫房名、人數、備註與通知身分（可多選）。"

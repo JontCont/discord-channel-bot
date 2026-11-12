@@ -10,7 +10,7 @@ from cogs.service.guild_settings_service import GuildSettings
 from cogs.slash.party import (
     PartyCommands,
     PartyCreateModal,
-    PartyCreatedView,
+    VoiceChannelLinkView,
     PartyJoinConfirmView,
     PartyPanelView,
     _open_party_modal,
@@ -128,10 +128,6 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
             field._value = value
         return modal
 
-    def created_view(self, role_ids=()):
-        self.party["notify_role_ids"] = list(role_ids)
-        return PartyCreatedView(self.bot, self.room, self.member.id)
-
     async def test_any_writable_text_channel_can_be_used_without_game_role(self):
         self.entry.name = "general-chat"
         self.member.roles = [self.level_role]
@@ -145,7 +141,7 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await _require_party_access(self.interaction))
         self.interaction.response.send_message.assert_awaited_once()
 
-    async def test_create_uses_selected_category_and_does_not_send_notification(self):
+    async def test_create_uses_selected_category_and_notifies_immediately(self):
         modal = self.modal()
         modal.category_select._values = ["31"]
         modal.notify_roles._values = ["100"]
@@ -160,9 +156,19 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(party["title"], "Room Name")
         self.assertEqual(party["notify_role_ids"], [100])
         self.assertNotIn("game", party)
-        self.notification.send.assert_not_awaited()
-        view = self.interaction.followup.send.call_args.kwargs["view"]
-        self.assertIsInstance(view, PartyCreatedView)
+        self.notification.send.assert_awaited_once()
+        kwargs = self.notification.send.call_args.kwargs
+        self.assertEqual(kwargs["content"], "<@&100>")
+        self.assertEqual(kwargs["allowed_mentions"].roles, [self.skill_role])
+        self.assertFalse(kwargs["allowed_mentions"].everyone)
+        self.assertFalse(kwargs["allowed_mentions"].users)
+        self.assertIsInstance(kwargs["view"], VoiceChannelLinkView)
+        reply = self.interaction.followup.send.call_args
+        self.assertIsInstance(reply.kwargs["view"], VoiceChannelLinkView)
+        self.assertFalse(
+            any(getattr(item, "label", None) == "分享房間" for item in reply.kwargs["view"].children)
+        )
+        self.assertIn("已通知到", reply.args[0])
 
     async def test_non_game_member_can_choose_activity_and_create_public_room(self):
         self.member.roles = [self.level_role]
@@ -180,7 +186,9 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(overwrite.view_channel)
         self.assertTrue(overwrite.connect)
         self.assertEqual(list(overwrites), [self.guild.default_role])
-        self.notification.send.assert_not_awaited()
+        kwargs = self.notification.send.call_args.kwargs
+        self.assertIsNone(kwargs["content"])
+        self.assertEqual(kwargs["allowed_mentions"].roles, [])
         self.assertEqual(
             self.bot.room_registry.register.call_args.kwargs["party"]["notify_role_ids"], []
         )
@@ -266,7 +274,7 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(modal.notify_roles.options[0].value, "none")
         self.assertFalse(modal.notify_roles.required)
 
-    async def test_multiple_selected_roles_are_saved_and_only_notified_on_share(self):
+    async def test_multiple_selected_roles_are_saved_and_mentioned_on_submit(self):
         another_role = Mock(spec=discord.Role)
         another_role.id = 102
         another_role.name = "湯技：墨繪術"
@@ -296,10 +304,7 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
             await modal.on_submit(self.interaction)
         party = self.bot.room_registry.register.call_args.kwargs["party"]
         self.assertEqual(party["notify_role_ids"], [100, 102])
-        self.notification.send.assert_not_awaited()
-        self.info["party"] = party
-        view = self.interaction.followup.send.call_args.kwargs["view"]
-        await view.share.callback(self.interaction)
+        self.notification.send.assert_awaited_once()
         self.assertEqual(
             self.notification.send.call_args.kwargs["allowed_mentions"].roles,
             [self.skill_role, another_role],
@@ -366,102 +371,39 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         message.reply.assert_awaited_once()
         self.assertIn("view", message.reply.call_args.kwargs)
 
-    async def test_explicit_share_only_mentions_owned_skill_and_cannot_repeat(self):
-        view = self.created_view([100])
-        await view.share.callback(self.interaction)
-        self.notification.send.assert_awaited_once()
-        kwargs = self.notification.send.call_args.kwargs
-        self.assertEqual(kwargs["content"], "<@&100>")
-        self.assertEqual(kwargs["allowed_mentions"].roles, [self.skill_role])
-        self.assertFalse(kwargs["allowed_mentions"].everyone)
-        self.assertFalse(kwargs["allowed_mentions"].users)
-        await view.share.callback(self.interaction)
-        self.notification.send.assert_awaited_once()
+    async def submit(self):
+        with patch.object(config, "DYNAMIC_VOICE_CREATE_ENABLED", True):
+            await self.modal().on_submit(self.interaction)
 
-    async def test_share_can_omit_role_mentions(self):
-        view = self.created_view()
-        await view.share.callback(self.interaction)
-        kwargs = self.notification.send.call_args.kwargs
-        self.assertIsNone(kwargs["content"])
-        self.assertEqual(kwargs["allowed_mentions"].roles, [])
-
-    async def test_share_can_use_specified_writable_text_channel(self):
-        custom = Mock(spec=discord.TextChannel)
-        custom.id = 33
-        custom.guild = self.guild
-        custom.permissions_for.return_value = self.permissions
-        custom.send = AsyncMock()
-        self.guild.get_channel.side_effect = lambda channel_id: (
-            custom if channel_id == 33 else self.room
-        )
-        view = self.created_view()
-        view.channel_select._values = [SimpleNamespace(id=33)]
-        await view.share.callback(self.interaction)
-        custom.send.assert_awaited_once()
+    async def test_missing_notification_channel_still_creates_room_with_warning(self):
+        self.general.text_channels = [self.entry]
+        self.guild.text_channels = [self.entry]
+        await self.submit()
+        self.bot.room_registry.register.assert_called_once()
         self.notification.send.assert_not_awaited()
+        self.assertIn("找不到揪團通知頻道", self.interaction.followup.send.call_args.args[0])
 
-    async def test_share_rejects_destination_without_bot_permission(self):
-        self.notification.permissions_for.side_effect = lambda member: (
-            self.permissions
-            if member is self.member
-            else SimpleNamespace(view_channel=True, send_messages=False, embed_links=True)
-        )
-        await self.created_view().share.callback(self.interaction)
-        self.notification.send.assert_not_awaited()
-
-    async def test_share_rejects_specified_destination_without_member_permission(self):
-        self.notification.id = 20
+    async def test_bot_without_send_permission_skips_notification_but_keeps_room(self):
         self.notification.permissions_for.return_value = SimpleNamespace(
-            view_channel=False, send_messages=False
+            view_channel=True, send_messages=False, embed_links=True
         )
-        self.guild.get_channel.side_effect = lambda channel_id: (
-            self.notification if channel_id == 20 else self.room
+        await self.submit()
+        self.bot.room_registry.register.assert_called_once()
+        self.notification.send.assert_not_awaited()
+        self.assertIn("未發送通知", self.interaction.followup.send.call_args.args[0])
+
+    async def test_notification_failure_does_not_roll_back_room(self):
+        self.notification.send.side_effect = discord.HTTPException(
+            SimpleNamespace(status=500, reason="error"), "boom"
         )
-        view = self.created_view()
-        view.channel_select._values = [SimpleNamespace(id=20)]
-        await view.share.callback(self.interaction)
-        self.notification.send.assert_not_awaited()
+        await self.submit()
+        self.bot.room_registry.register.assert_called_once()
+        self.assertIn("通知發送失敗", self.interaction.followup.send.call_args.args[0])
 
-    async def test_share_rejects_non_text_destination(self):
-        view = self.created_view()
-        view.channel_select._values = [SimpleNamespace(id=77)]
-        await view.share.callback(self.interaction)
-        self.notification.send.assert_not_awaited()
-
-    async def test_share_rejects_destination_from_another_guild(self):
-        self.notification.id = 20
-        self.notification.guild = SimpleNamespace(id=11)
-        self.guild.get_channel.side_effect = lambda channel_id: (
-            self.notification if channel_id == 20 else self.room
-        )
-        view = self.created_view()
-        view.channel_select._values = [SimpleNamespace(id=20)]
-        await view.share.callback(self.interaction)
-        self.notification.send.assert_not_awaited()
-
-    async def test_share_rejects_non_skill_roles_and_roles_no_longer_owned(self):
-        for role_id, roles in (
-            ("101", [self.skill_role, self.level_role]),
-            ("100", [self.level_role]),
-        ):
-            with self.subTest(role_id=role_id):
-                self.member.roles = roles
-                view = self.created_view([int(role_id)])
-                await view.share.callback(self.interaction)
-        self.notification.send.assert_not_awaited()
-
-    async def test_share_rejects_other_owner_deleted_room_and_notice_permission(self):
-        view = self.created_view()
-        self.member.id = 41
-        await view.share.callback(self.interaction)
-        self.member.id = 40
-        self.bot.room_registry.get.return_value = None
-        await view.share.callback(self.interaction)
-        self.bot.room_registry.get.return_value = self.info
-        self.notification.permissions_for.return_value = SimpleNamespace(
-            view_channel=True, send_messages=False
-        )
-        await view.share.callback(self.interaction)
+    async def test_disabled_dynamic_voice_neither_creates_room_nor_notifies(self):
+        with patch.object(config, "DYNAMIC_VOICE_CREATE_ENABLED", False):
+            await self.modal().on_submit(self.interaction)
+        self.guild.create_voice_channel.assert_not_awaited()
         self.notification.send.assert_not_awaited()
 
     async def test_room_list_hides_rooms_without_access(self):
