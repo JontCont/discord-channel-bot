@@ -6,6 +6,17 @@
 再依 `feature`、`bug`、`chore`、`docs`、
 `refactor`、`test` 分類。分類使用 `### 分類`，只保留有內容的分類。
 
+## 2026-11-12 - 00 - 簡化部署 Webhook 觸發流程不等待回應
+
+### chore
+
+- 移除部署工作流程對 Webhook 回傳內容的檢查與逾時等待，改為成功送出請求即完成。
+- 部署執行失敗由 n8n 直接透過 Discord 通知，避免 Actions 因 NAS 重啟耗時逾時。
+
+### docs
+
+- 更新 README 部署說明，註記 Webhook 為非同步觸發與通知機制。
+
 ## 2026-11-11 - 03 - 網站可編輯 Discord 社群面板文案
 
 ### feature

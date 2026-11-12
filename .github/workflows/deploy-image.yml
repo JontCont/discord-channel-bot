@@ -37,18 +37,10 @@ jobs:
             --arg image "${REGISTRY}/${IMAGE_NAME,,}-${IMAGE_SUFFIX}" \
             --arg tag "latest" \
             '{image: $image, tag: $tag}')
-          response=$(curl --fail-with-body --show-error --silent \
-            --connect-timeout 10 --max-time 60 \
+          curl --fail --show-error --silent \
+            --connect-timeout 10 --max-time 30 \
             --request POST \
             "${DEPLOY_WEBHOOK_URL%/}/${DEPLOY_PROJECT}" \
             --header "Content-Type: application/json" \
-            --data "$payload")
-          printf '%s\n' "$response"
-          if ! jq -e -s \
-            --arg project "$DEPLOY_PROJECT" \
-            --arg image "${REGISTRY}/${IMAGE_NAME,,}-${IMAGE_SUFFIX}:latest" \
-            'length == 1 and (.[0] | type == "object" and .status == "success" and .project == $project and .image == $image)' \
-            <<< "$response" > /dev/null; then
-            echo "::error::Deployment webhook did not confirm success for the expected project and image."
-            exit 1
-          fi
+            --data "$payload"
+          echo "Deployment webhook triggered successfully for ${DEPLOY_PROJECT}."

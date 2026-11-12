@@ -172,9 +172,7 @@ CI/CD 在預設分支的 `latest` image 成功推送至 GHCR 後，會分別 POS
 
 Pull Request 與版本標籤建置不會觸發部署 webhook；手動執行預設分支的 workflow
 則會觸發。Webhook 連線失敗、逾時或回傳 HTTP 錯誤時，對應的建置 job 會失敗。
-回應必須是單一 JSON 物件，且 `status` 為 `success`、`project` 與 `image`（含
-`:latest`）符合本次部署目標，否則 job 也會失敗。回應會保留在 Actions 日誌中，
-包含 webhook 提供的 `timestamp`。
+Webhook 觸發後即完成該步驟，NAS 部署或重啟過程的異常由 n8n 直接發送 Discord 警報通知。
 原有的 Discord webhook 通知保持不變。
 
 ### 每次提交的更新紀錄
