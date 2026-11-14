@@ -6,6 +6,19 @@
 再依 `feature`、`bug`、`chore`、`docs`、
 `refactor`、`test` 分類。分類使用 `### 分類`，只保留有內容的分類。
 
+## 2026-11-14 - 03
+
+修復 GitHub Actions 語法檢查路徑與優化驗證邏輯認知複雜度
+
+### bug
+
+- 修正 .github/workflows/build-image.yml 在 Check API Python Syntax 步驟中因 cogs/repository/*.py 與 cogs/service/*.py 路徑不存在導致的 CI/CD 建置失敗，改為統一使用 python -m compileall -q . 遞迴編譯 apps/bot 內所有模組。
+
+### refactor
+
+- 重構 apps/bot/service/guild_settings_service.py 的 _validate 方法，依領域拆分為 6 個單一職責驗證函式，將認知複雜度（Cognitive Complexity）由 22 驟降至 0；同步抽離 _parse_single_level_role 將 _validate_level_roles 複雜度由 19 降至 6，滿足 SonarLint 15 以下之靜態品質標準。
+- 同步更新 nx.json 中的 pythonSources 輸入監聽路徑，納入 api、core、models、repository 與 service 等新建分層目錄。
+
 ## 2026-11-14 - 02
 
 重構後端為 Clean Layered Architecture，解耦資料存取、業務服務、API 表現層與配置邊界

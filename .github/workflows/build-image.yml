@@ -44,11 +44,7 @@ jobs:
         if: inputs.image == 'bot'
         working-directory: apps/bot
         run: |
-          python -m py_compile bot.py config.py
-          python -m py_compile cogs/prefix/*.py
-          python -m py_compile cogs/slash/*.py
-          python -m py_compile cogs/repository/*.py
-          python -m py_compile cogs/service/*.py
+          python -m compileall -q .
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

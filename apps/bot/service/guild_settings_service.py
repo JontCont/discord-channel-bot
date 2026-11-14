@@ -75,12 +75,24 @@ class GuildSettingsService:
 
     @classmethod
     def _validate(cls, settings: GuildSettings) -> None:
+        """主校驗入口：依據領域責任拆分各項獨立校驗。"""
+        cls._validate_panel_texts(settings)
+        cls._validate_booleans(settings)
+        cls._validate_required_strings(settings)
+        cls._validate_triggers(settings)
+        cls._validate_integers(settings)
+        cls._validate_xp_settings(settings)
+
+    @classmethod
+    def _validate_panel_texts(cls, settings: GuildSettings) -> None:
+        """校驗所有面板文字長度限制與總字數約束。"""
         for name, maximum in cls.PANEL_TEXT_LIMITS.items():
             value = getattr(settings, name)
-            if not isinstance(value, str) or name != "skill_panel_footer" and not value.strip():
+            if not isinstance(value, str) or (name != "skill_panel_footer" and not value.strip()):
                 raise ValueError(f"{name} must be a non-empty string")
             if len(value) > maximum:
                 raise ValueError(f"{name} must not exceed {maximum} characters")
+
         party_text = (
             settings.party_panel_title,
             settings.party_panel_description,
@@ -91,38 +103,56 @@ class GuildSettingsService:
         )
         if sum(map(len, party_text)) > 6000:
             raise ValueError("room panel text must not exceed 6000 characters in total")
-        if sum(map(len, (
-            settings.skill_panel_title, settings.skill_panel_description, settings.skill_panel_footer,
-        ))) > 6000:
+
+        skill_text = (
+            settings.skill_panel_title,
+            settings.skill_panel_description,
+            settings.skill_panel_footer,
+        )
+        if sum(map(len, skill_text)) > 6000:
             raise ValueError("skill panel text must not exceed 6000 characters in total")
+
+    @classmethod
+    def _validate_booleans(cls, settings: GuildSettings) -> None:
+        """校驗布林型態開關。"""
         for name in cls._BOOLEAN_NAMES:
             value = getattr(settings, name)
             if not isinstance(value, bool):
                 raise ValueError(f"{name} must be a boolean")
 
+    @classmethod
+    def _validate_required_strings(cls, settings: GuildSettings) -> None:
+        """校驗必填非空字串欄位。"""
         for name in cls._REQUIRED_NAMES:
             value = getattr(settings, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be a non-empty string")
 
+    @staticmethod
+    def _validate_triggers(settings: GuildSettings) -> None:
+        """校驗觸發詞唯一性。"""
         if (
             settings.auto_voice_trigger.strip().casefold()
             == settings.private_trigger.strip().casefold()
         ):
             raise ValueError("auto_voice_trigger and private_trigger must be unique")
 
+    @classmethod
+    def _validate_integers(cls, settings: GuildSettings) -> None:
+        """校驗整數範圍。"""
         for name, (minimum, maximum) in cls._INTEGER_RANGES.items():
             value = getattr(settings, name)
             if type(value) is not int:
                 raise ValueError(f"{name} must be an integer")
-            if value < minimum or maximum is not None and value > maximum:
+            if value < minimum or (maximum is not None and value > maximum):
                 upper = f" and at most {maximum}" if maximum is not None else ""
                 raise ValueError(f"{name} must be at least {minimum}{upper}")
 
+    @staticmethod
+    def _validate_xp_settings(settings: GuildSettings) -> None:
+        """校驗經驗值範圍邊界。"""
         if settings.xp_per_message_min > settings.xp_per_message_max:
-            raise ValueError(
-                "xp_per_message_min must not exceed xp_per_message_max"
-            )
+            raise ValueError("xp_per_message_min must not exceed xp_per_message_max")
 
     @staticmethod
     def _validate_guild_id(guild_id: int) -> None:
@@ -141,25 +171,27 @@ class GuildSettingsService:
         return normalized
 
     @staticmethod
-    def _validate_level_roles(value: Any) -> tuple[tuple[int, str, int], ...]:
+    def _parse_single_level_role(role: Any) -> tuple[int, str, int]:
+        """解析單一等級身分組定義並驗證其屬性型態與邊界。"""
+        if not isinstance(role, (list, tuple)) or len(role) != 3:
+            raise ValueError("each level role must contain level, name, and color")
+        level, role_name, color = role
+        if type(level) is not int or level < 1:
+            raise ValueError("level role levels must be positive integers")
+        if not isinstance(role_name, str) or not role_name.strip():
+            raise ValueError("level role names must be non-empty strings")
+        if type(color) is not int or not 0 <= color <= 0xFFFFFF:
+            raise ValueError("level role colors must be integers from 0 to 0xFFFFFF")
+        return (level, role_name.strip(), color)
+
+    @classmethod
+    def _validate_level_roles(cls, value: Any) -> tuple[tuple[int, str, int], ...]:
         if not isinstance(value, (list, tuple)) or isinstance(value, (str, bytes)):
             raise ValueError("level_roles must be a list of role definitions")
         if not value:
             raise ValueError("level_roles must contain at least one role")
 
-        roles: list[tuple[int, str, int]] = []
-        for role in value:
-            if not isinstance(role, (list, tuple)) or len(role) != 3:
-                raise ValueError("each level role must contain level, name, and color")
-            level, role_name, color = role
-            if type(level) is not int or level < 1:
-                raise ValueError("level role levels must be positive integers")
-            if not isinstance(role_name, str) or not role_name.strip():
-                raise ValueError("level role names must be non-empty strings")
-            if type(color) is not int or not 0 <= color <= 0xFFFFFF:
-                raise ValueError("level role colors must be integers from 0 to 0xFFFFFF")
-            roles.append((level, role_name.strip(), color))
-
+        roles = [cls._parse_single_level_role(role) for role in value]
         levels = [level for level, _, _ in roles]
         names = [name for _, name, _ in roles]
         if len(set(levels)) != len(levels):

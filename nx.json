@@ -12,7 +12,12 @@
     "pythonSources": [
       "{projectRoot}/bot.py",
       "{projectRoot}/config.py",
+      "{projectRoot}/api/**/*.py",
       "{projectRoot}/cogs/**/*.py",
+      "{projectRoot}/core/**/*.py",
+      "{projectRoot}/models/**/*.py",
+      "{projectRoot}/repository/**/*.py",
+      "{projectRoot}/service/**/*.py",
       "{projectRoot}/requirements.txt",
       {
         "runtime": "python --version"
