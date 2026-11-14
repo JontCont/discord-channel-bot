@@ -113,10 +113,13 @@ def validate_commits(repo: Path, base: str, head: str) -> int:
             current = latest_entry(git(repo, "show", f"{commit}:CHANGELOG.md"))
             parents = git(repo, "show", "-s", "--format=%P", commit).split()
             if parents and git(repo, "ls-tree", "--name-only", parents[0], "--", "CHANGELOG.md").strip():
-                # Previous commits may predate build numbering.
-                previous = _categorized_entry(
-                    git(repo, "show", f"{parents[0]}:CHANGELOG.md"), require_description=False
-                )
+                # Previous commits may predate build numbering or categorized format.
+                try:
+                    previous = _categorized_entry(
+                        git(repo, "show", f"{parents[0]}:CHANGELOG.md"), require_description=False
+                    )
+                except ValueError:
+                    previous = None
                 if current == previous:
                     errors.append(f"{label}: the latest CHANGELOG.md entry was not updated.")
         except ValueError as error:

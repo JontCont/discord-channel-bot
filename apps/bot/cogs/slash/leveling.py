@@ -142,6 +142,8 @@ class Leveling(commands.Cog):
             return
 
         settings = await self.bot.guild_settings_service.get(message.guild.id)
+        if not getattr(settings, "leveling_enabled", True):
+            return
         now = time.time()
         cooldown_key = (message.guild.id, message.author.id)
         last = self._msg_cooldowns.get(cooldown_key, 0)
@@ -187,6 +189,8 @@ class Leveling(commands.Cog):
 
         for guild in self.bot.guilds:
             settings = await self.bot.guild_settings_service.get(guild.id)
+            if not getattr(settings, "leveling_enabled", True):
+                continue
             if now < self._voice_next_due.get(guild.id, now):
                 continue
 
@@ -222,6 +226,11 @@ class Leveling(commands.Cog):
     )
     async def daily(self, interaction: discord.Interaction):
         settings = await self.bot.guild_settings_service.get(interaction.guild.id)
+        if not getattr(settings, "leveling_enabled", True):
+            await interaction.response.send_message(
+                "🚫 此伺服器目前未啟用等級與活躍值系統。", ephemeral=True
+            )
+            return
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         result = await self.db.do_daily(interaction.user.id, interaction.guild.id, today)
 

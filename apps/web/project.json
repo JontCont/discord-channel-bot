@@ -7,6 +7,11 @@
     "dev": {
       "command": "pnpm --dir apps/web dev"
     },
+    "dev-mock": {
+      "command": "pnpm --dir apps/web dev:mock",
+      "cache": false,
+      "continuous": true
+    },
     "build": {
       "command": "pnpm --dir apps/web build",
       "outputs": ["{workspaceRoot}/apps/web/dist"]

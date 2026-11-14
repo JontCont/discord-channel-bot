@@ -11,6 +11,10 @@ export class ApiError extends Error {
 }
 
 async function apiRequest(path: string, init?: RequestInit): Promise<unknown> {
+  if (import.meta.env.VITE_MOCK === 'true') {
+    const { mockRequest } = await import('./mock-api')
+    return mockRequest(path, init)
+  }
   const response = await fetch(path, {
     ...init,
     credentials: 'include',
@@ -55,20 +59,40 @@ const categorySchema = z.object({
   name: z.string(),
 })
 
+const textChannelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: z.string().nullish(),
+})
+
+const skillSchema = z.object({
+  name: z.string(),
+  emoji: z.string().nullish(),
+  category_name: z.string(),
+  role_name: z.string(),
+  member_count: z.number().int(),
+  invite_code: z.string(),
+  direct_join: z.boolean(),
+})
+
 export const settingsSchema = z
   .object({
+    auto_voice_enabled: z.boolean().default(true),
     auto_voice_trigger: z.string(),
     auto_voice_suffix: z.string(),
     auto_voice_limit: z.number().int(),
+    private_rooms_enabled: z.boolean().default(true),
     private_category: z.string(),
     private_trigger: z.string(),
     private_suffix: z.string(),
     private_limit: z.number().int(),
     password_channel: z.string(),
+    skills_enabled: z.boolean().default(true),
     skill_prefix: z.string(),
     skill_panel_channel: z.string(),
     skill_panel_direct_join_skills: z.array(z.string()),
-    party_category: z.string(),
+    party_enabled: z.boolean().default(true),
+    party_notification_channel: z.string().default('📣｜揪團通知'),
     party_panel_title: z.string(),
     party_panel_description: z.string(),
     party_panel_create_heading: z.string(),
@@ -80,6 +104,7 @@ export const settingsSchema = z
     skill_panel_title: z.string(),
     skill_panel_description: z.string(),
     skill_panel_footer: z.string(),
+    leveling_enabled: z.boolean().default(true),
     xp_per_message_min: z.number().int(),
     xp_per_message_max: z.number().int(),
     xp_message_cooldown: z.number().int(),
@@ -94,6 +119,8 @@ export const settingsSchema = z
 export type User = z.infer<typeof meSchema>
 export type Guild = z.infer<typeof guildSchema>
 export type GuildCategory = z.infer<typeof categorySchema>
+export type GuildTextChannel = z.infer<typeof textChannelSchema>
+export type GuildSkill = z.infer<typeof skillSchema>
 export type GuildSettings = z.infer<typeof settingsSchema>
 
 function unwrap<T>(data: unknown, key: string, schema: z.ZodType<T>): T {
@@ -124,6 +151,57 @@ export async function getGuildCategories(guildId: string): Promise<GuildCategory
     await apiRequest(`/api/guilds/${encodeURIComponent(guildId)}/categories`),
     'categories',
     z.array(categorySchema),
+  )
+}
+
+export async function getGuildChannels(guildId: string): Promise<GuildTextChannel[]> {
+  return unwrap(
+    await apiRequest(`/api/guilds/${encodeURIComponent(guildId)}/channels`),
+    'channels',
+    z.array(textChannelSchema),
+  )
+}
+
+export async function getGuildSkills(guildId: string): Promise<GuildSkill[]> {
+  return unwrap(
+    await apiRequest(`/api/guilds/${encodeURIComponent(guildId)}/skills`),
+    'skills',
+    z.array(skillSchema),
+  )
+}
+
+export async function createGuildSkill(
+  guildId: string,
+  payload: { name: string; emoji?: string },
+): Promise<GuildSkill> {
+  return unwrap(
+    await apiRequest(`/api/guilds/${encodeURIComponent(guildId)}/skills`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+    'skill',
+    skillSchema,
+  )
+}
+
+export async function regenerateGuildSkillCode(
+  guildId: string,
+  skillName: string,
+): Promise<string> {
+  const data = await apiRequest(
+    `/api/guilds/${encodeURIComponent(guildId)}/skills/${encodeURIComponent(skillName)}/regenerate-code`,
+    { method: 'POST' },
+  )
+  return unwrap(data, 'invite_code', z.string())
+}
+
+export async function deleteGuildSkill(
+  guildId: string,
+  skillName: string,
+): Promise<void> {
+  await apiRequest(
+    `/api/guilds/${encodeURIComponent(guildId)}/skills/${encodeURIComponent(skillName)}`,
+    { method: 'DELETE' },
   )
 }
 

@@ -48,7 +48,8 @@ class PrivateRoom(commands.Cog):
 
         # Private room trigger
         if (
-            after.channel is not None
+            getattr(settings, "private_rooms_enabled", True)
+            and after.channel is not None
             and after.channel.name == settings.private_trigger
         ):
             category = after.channel.category

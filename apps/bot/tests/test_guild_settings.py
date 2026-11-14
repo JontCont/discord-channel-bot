@@ -20,6 +20,11 @@ class GuildSettingsServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(settings, GuildSettings)
         self.assertEqual(settings.auto_voice_trigger, config.AUTO_VOICE_TRIGGER)
+        self.assertTrue(settings.auto_voice_enabled)
+        self.assertTrue(settings.private_rooms_enabled)
+        self.assertTrue(settings.skills_enabled)
+        self.assertTrue(settings.party_enabled)
+        self.assertTrue(settings.leveling_enabled)
         self.assertEqual(settings.auto_voice_limit, config.AUTO_VOICE_LIMIT)
         self.assertEqual(settings.private_trigger, config.PRIVATE_TRIGGER)
         self.assertEqual(settings.private_limit, config.PRIVATE_LIMIT)
@@ -28,7 +33,6 @@ class GuildSettingsServiceTests(unittest.IsolatedAsyncioTestCase):
             settings.skill_panel_direct_join_skills,
             tuple(config.SKILL_PANEL_DIRECT_JOIN_SKILLS),
         )
-        self.assertEqual(settings.party_category, "湯技：遊戲術 🎮")
         self.assertEqual(settings.xp_per_message_min, config.XP_PER_MESSAGE_MIN)
         self.assertEqual(settings.level_roles, tuple(config.LEVEL_ROLES))
         self.assertIsInstance(json.dumps(settings.to_dict()), str)
@@ -37,22 +41,24 @@ class GuildSettingsServiceTests(unittest.IsolatedAsyncioTestCase):
         updated = await self.service.update(
             10,
             {
+                "auto_voice_enabled": False,
                 "auto_voice_limit": 12,
                 "private_category": "Members Only",
+                "party_enabled": False,
                 "skill_panel_direct_join_skills": ["Cooking", "Music"],
-                "party_category": "Gaming",
                 "level_roles": [[1, "Newcomer", 0x123456], [5, "Regular", 0]],
             },
         )
 
         reloaded = await GuildSettingsService(self.db).get(10)
         self.assertEqual(reloaded, updated)
+        self.assertFalse(reloaded.auto_voice_enabled)
+        self.assertFalse(reloaded.party_enabled)
         self.assertEqual(reloaded.auto_voice_limit, 12)
         self.assertEqual(reloaded.private_category, "Members Only")
         self.assertEqual(
             reloaded.skill_panel_direct_join_skills, ("Cooking", "Music")
         )
-        self.assertEqual(reloaded.party_category, "Gaming")
         self.assertEqual(
             reloaded.level_roles,
             ((1, "Newcomer", 0x123456), (5, "Regular", 0)),
@@ -103,12 +109,11 @@ class GuildSettingsServiceTests(unittest.IsolatedAsyncioTestCase):
                 await self.service.update(51, changes)
         self.assertEqual(await self.db.get_all(51), {})
 
-    async def test_legacy_party_skill_is_read_as_party_category(self):
-        await self.db.set_many(21, {"party_skill": "遊戲術"})
+    async def test_legacy_party_keys_are_ignored(self):
+        await self.db.set_many(21, {"party_skill": "遊戲術", "party_category": "遊戲術"})
 
         settings = await self.service.get(21)
-
-        self.assertEqual(settings.party_category, "湯技：遊戲術 🎮")
+        self.assertNotIn("party_category", settings.to_dict())
 
     async def test_rejects_invalid_updates_without_persisting_them(self):
         invalid_changes = {

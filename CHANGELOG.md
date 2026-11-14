@@ -6,6 +6,19 @@
 再依 `feature`、`bug`、`chore`、`docs`、
 `refactor`、`test` 分類。分類使用 `### 分類`，只保留有內容的分類。
 
+## 2026-11-14 - 01
+
+新增 Web Mock 環境、模組化後台介面與湯技／揪團通知管理功能
+
+### feature
+
+- 各大功能模組（自動語音、私人包廂、湯技系統、社群揪團、等級經驗值）新增 Enable Switch 功能開關（`auto_voice_enabled`、`private_rooms_enabled`、`skills_enabled`、`party_enabled`、`leveling_enabled`），Dashboard 卡片牆可直接以 Switch 一鍵開關，左側選單目錄自動動態顯示開啟之模組（未開啟則自動隱藏），各模組內頁亦提供開關與停用提示，Bot 端同步攔截已停用功能的觸發、經驗值發放與開房互動。
+- Web 設定後台改為「左側模組導覽列（方案 A）＋ 模組總覽 Dashboard 卡片牆（方案 B）」雙模式架構，將設定拆分為「語音與私人包廂」、「湯技角色系統」、「社群與揪團面板」、「活躍值與等級」與「Slash 指令說明」，並支援各模組即時設定摘要與未儲存／驗證錯誤狀態提示。
+- 等級身分組（`level_roles`）改用 VS Code 核心的 Monaco Editor（`@monaco-editor/react`），內建 JSON Schema 型別提示、格式化、深淺色主題同步，並提供「視覺化表格」與色票選色器雙向同步轉換十進位色碼。
+- 湯技角色系統新增管理員專用「建立新湯技與已建立清單（`SkillsManager`）」介面（串接 `GET/POST/DELETE /api/guilds/{guild_id}/skills` 與 `POST .../regenerate-code`），支援直接建立湯技、檢視已建立湯技與成員數、複製與重設 `/skill join` 專屬邀請碼、一鍵切換面板直接加入，並移除無作用的「語音房預設類別」欄位。
+- 社群與揪團面板（房間大廳）後台新增 `party_notification_channel` 下拉選單（透過 `GET /api/guilds/{guild_id}/channels` 載入伺服器文字頻道，支援儲存 Channel ID 或既有頻道名稱）：建房表單送出時若有選擇「通知身分」即直接發送通知至該頻道，若未選擇任何通知身分則不發送通知訊息。
+- 新增 Web Mock 模式 `pnpm run web:mock`（Nx target `web:dev-mock`）：以記憶體假資料略過登入，直接進入伺服器設定編輯畫面；正式建置不含 Mock 程式碼。
+
 ## 2026-11-14 - 00
 
 變更紀錄改用 CHANGELOG.md

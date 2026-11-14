@@ -94,11 +94,27 @@ async def _notification_channel(
     bot: commands.Bot, guild: discord.Guild
 ) -> discord.TextChannel | None:
     settings = await bot.guild_settings_service.get(guild.id)
+    target = getattr(
+        settings, "party_notification_channel", config.PARTY_NOTIFICATION_CHANNEL
+    ).strip()
+    raw_id = (
+        target[2:-1].strip()
+        if target.startswith("<#") and target.endswith(">")
+        else target
+    )
+    if raw_id.isdigit():
+        channel_id = int(raw_id)
+        channel = guild.get_channel(channel_id)
+        if isinstance(channel, discord.TextChannel):
+            return channel
+        return discord.utils.get(guild.text_channels, id=channel_id)
+
+    channel_name = target or config.PARTY_NOTIFICATION_CHANNEL
     entry = discord.utils.get(guild.text_channels, name=settings.skill_panel_channel)
     if entry is None or entry.category is None:
         return None
     return discord.utils.get(
-        entry.category.text_channels, name=config.PARTY_NOTIFICATION_CHANNEL
+        entry.category.text_channels, name=channel_name
     )
 
 
@@ -162,6 +178,14 @@ async def _require_party_access(interaction: discord.Interaction) -> bool:
             "🚫 你沒有在這個文字頻道發文的權限。", ephemeral=True
         )
         return False
+    client = getattr(interaction, "client", None)
+    if hasattr(client, "guild_settings_service"):
+        settings = await client.guild_settings_service.get(guild.id)
+        if not getattr(settings, "party_enabled", True):
+            await interaction.response.send_message(
+                "🚫 此伺服器目前未啟用揪團房間功能。", ephemeral=True
+            )
+            return False
     return True
 
 
@@ -186,6 +210,8 @@ async def _announce_party(
     roles: list[discord.Role],
 ) -> str:
     """Post the new room to the notification channel and return a status line."""
+    if not roles:
+        return "ℹ️ 未選擇通知身分，不發送揪團通知。"
     destination = await _notification_channel(bot, guild)
     if destination is None:
         return "⚠️ 找不到揪團通知頻道，未發送通知；請管理員執行 /party setup。"
@@ -295,8 +321,8 @@ class PartyCreateModal(discord.ui.Modal, title="建立房間"):
             raise ValueError("Room form requires at least one available category")
         default_id = next((
             category.id for category in categories[:25]
-            if category.name.casefold() == default_category.casefold()
-        ), None)
+            if default_category and category.name.casefold() == default_category.casefold()
+        ), categories[0].id)
         self.category_select = discord.ui.Select(
             custom_id="room_category",
             placeholder="選擇房間建立位置",
@@ -349,7 +375,7 @@ class PartyCreateModal(discord.ui.Modal, title="建立房間"):
         self.add_item(discord.ui.Label(text="備註", component=self.note))
         self.add_item(discord.ui.Label(
             text="通知身分",
-            description="只列已加入湯技（最多前 25 個），可多選或不選；送出後立即通知。",
+            description="只列已加入湯技（最多前 25 個），可多選；送出後立即通知，不選則不發送通知。",
             component=self.notify_roles,
         ))
 
@@ -499,7 +525,7 @@ async def _open_party_modal(bot: commands.Bot, interaction: discord.Interaction)
         return
     roles = await _shareable_roles(bot, member)
     await interaction.response.send_modal(
-        PartyCreateModal(bot, categories, roles, settings.party_category)
+        PartyCreateModal(bot, categories, roles)
     )
 
 
@@ -705,9 +731,17 @@ class PartyCommands(commands.GroupCog, name="party"):
         )
         if entry is not None and entry.category is not None:
             notification = await _notification_channel(self.bot, channel.guild)
-            if notification is None:
+            configured_target = getattr(
+                settings, "party_notification_channel", config.PARTY_NOTIFICATION_CHANNEL
+            ).strip()
+            raw_id = (
+                configured_target[2:-1].strip()
+                if configured_target.startswith("<#") and configured_target.endswith(">")
+                else configured_target
+            )
+            if notification is None and not raw_id.isdigit():
                 await entry.category.create_text_channel(
-                    config.PARTY_NOTIFICATION_CHANNEL,
+                    configured_target or config.PARTY_NOTIFICATION_CHANNEL,
                     topic="新建房間的自動通知；只會標記房主已加入的湯技。",
                     reason="Community room notifications setup",
                 )

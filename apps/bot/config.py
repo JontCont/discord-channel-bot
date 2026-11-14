@@ -124,10 +124,9 @@ def _parse_name_list(raw: str) -> list[str]:
 SKILL_PANEL_DIRECT_JOIN_SKILLS = _parse_name_list(
     os.getenv(
         "SKILL_PANEL_DIRECT_JOIN_SKILLS",
-        "鍛造術,遊戲術,墨繪術,幻想術",
+        "鍛造術,遊戲術,墨繪術",
     )
 )
-PARTY_CATEGORY = os.getenv("PARTY_CATEGORY", "湯技：遊戲術 🎮")
 PARTY_NOTIFICATION_CHANNEL = _get_localized_env(
     "PARTY_NOTIFICATION_CHANNEL", BOT_LANGUAGE, "📣｜揪團通知", "party-notifications"
 )

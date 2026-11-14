@@ -38,7 +38,8 @@ class AutoVoice(commands.Cog):
 
         # Public voice trigger
         if (
-            config.DYNAMIC_VOICE_CREATE_ENABLED
+            getattr(settings, "auto_voice_enabled", True)
+            and config.DYNAMIC_VOICE_CREATE_ENABLED
             and after.channel is not None
             and after.channel.name == settings.auto_voice_trigger
         ):

@@ -9,6 +9,7 @@
     "test": "nx run bot:test",
     "compile": "nx run bot:compile",
     "graph": "nx graph",
+    "web:mock": "nx run web:dev-mock",
     "docker:dev": "nx run bot:docker-dev",
     "docker:dev:down": "nx run bot:docker-dev-down",
     "docker:dev:logs": "nx run bot:docker-dev-logs",

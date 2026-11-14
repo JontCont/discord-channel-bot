@@ -93,6 +93,12 @@ uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py
 pnpm nx run web:dev
 ```
 
+To tweak the web UI without logging in or running the bot, use mock mode (data lives in memory and resets on reload):
+
+```powershell
+pnpm run web:mock   # http://localhost:5173, opens the mock server's settings page directly
+```
+
 For local development set `DISCORD_REDIRECT_URI` to
 `http://localhost:5173/api/auth/callback`. Production must use HTTPS and set
 `SESSION_COOKIE_SECURE=true`.
@@ -294,7 +300,7 @@ Set these in your `.env` file:
 | `SKILL_PREFIX` | — | locale-based | Skill category prefix |
 | `SKILL_PANEL_CHANNEL` | — | locale-based | Shared Skill / room-creation hub name, zh-TW default "🎯｜社群入口" |
 | `PARTY_NOTIFICATION_CHANNEL` | — | locale-based | Share-notification channel in the hub's category, zh-TW default "📣｜揪團通知" |
-| `SKILL_PANEL_DIRECT_JOIN_SKILLS` | — | `鍛造術,遊戲術,墨繪術,幻想術` | Skills that can be joined by button when `/skill panel` has no `direct_join_skills` |
+| `SKILL_PANEL_DIRECT_JOIN_SKILLS` | — | `鍛造術,遊戲術,墨繪術` | Skills that can be joined by button when `/skill panel` has no `direct_join_skills` |
 | `LEVELING_DB_PATH` | — | `data/leveling.db` | Leveling database file path |
 | `XP_PER_MESSAGE_MIN` | — | `15` | Minimum XP per message |
 | `XP_PER_MESSAGE_MAX` | — | `25` | Maximum XP per message |

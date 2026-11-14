@@ -16,6 +16,7 @@ if HAS_API_DEPENDENCIES:
 
     from cogs.api import ApiConfig, create_api
     from cogs.api.app import SESSION_COOKIE
+    from cogs.service.skill_service import SkillService
     from cogs.slash.party import PartyCommands
     from cogs.slash.skill_commands import SkillCommands
 
@@ -40,7 +41,6 @@ class FakeSettings:
             "skill_panel_channel": self.skill_panel_channel,
             "skill_panel_title": self.skill_panel_title,
             "skill_panel_direct_join_skills": ["Music"],
-            "party_category": "Gaming",
             "xp_per_message_min": 1,
             "xp_per_message_max": 3,
             "xp_message_cooldown": 10,
@@ -85,8 +85,11 @@ class FakeCategory:
 
 @dataclass
 class FakeGuild:
-    categories: list[FakeCategory]
+    id: int = 100
+    categories: list[FakeCategory] = field(default_factory=list)
     text_channels: list[Any] = field(default_factory=list)
+    roles: list[Any] = field(default_factory=list)
+    default_role: Any = field(default_factory=Mock)
 
 
 class FakeBot:
@@ -94,10 +97,11 @@ class FakeBot:
         self.cogs: dict[str, Any] = {}
         self.guilds = {
             guild_id: FakeGuild(
+                id=guild_id,
                 categories=[
                     FakeCategory(guild_id + 1, "遊戲術"),
                     FakeCategory(guild_id + 2, "私人包廂"),
-                ]
+                ],
             )
             for guild_id in guild_ids
         }
@@ -206,6 +210,7 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             ("GET", "/api/guilds"),
             ("GET", "/api/guilds/100/settings"),
             ("GET", "/api/guilds/100/categories"),
+            ("GET", "/api/guilds/100/channels"),
             ("PUT", "/api/guilds/100/settings"),
         ):
             with self.subTest(method=method, path=path):
@@ -300,6 +305,105 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
                 {"id": "102", "name": "私人包廂"},
             ],
         )
+
+    async def test_channels_returns_guild_text_channels(self):
+        self.authenticate()
+        guild = self.bot.get_guild(100)
+        guild.text_channels = [
+            SimpleNamespace(
+                id=1001,
+                name="📣｜揪團通知",
+                category=SimpleNamespace(name="湯技：遊戲術 🎮"),
+            ),
+            SimpleNamespace(
+                id=1002,
+                name="一般閒聊",
+                category=None,
+            ),
+        ]
+
+        response = await self.client.get("/api/guilds/100/channels")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["channels"],
+            [
+                {"id": "1001", "name": "📣｜揪團通知", "category": "湯技：遊戲術 🎮"},
+                {"id": "1002", "name": "一般閒聊", "category": None},
+            ],
+        )
+
+    async def test_skills_list_create_regenerate_and_delete(self):
+        self.authenticate()
+        guild = self.bot.get_guild(100)
+        codes: dict[str, str] = {}
+
+        class InMemoryInviteRepo:
+            def get(self, guild_id: int, skill_name: str):
+                return codes.get(f"{guild_id}:{skill_name.lower()}")
+
+            def set(self, guild_id: int, skill_name: str, code: str):
+                codes[f"{guild_id}:{skill_name.lower()}"] = code
+
+            def delete(self, guild_id: int, skill_name: str):
+                codes.pop(f"{guild_id}:{skill_name.lower()}", None)
+
+            def codes_for_guild(self, guild_id: int):
+                return {v for k, v in codes.items() if k.startswith(f"{guild_id}:")}
+
+        skill_cog = Mock(spec=SkillCommands)
+        skill_cog.skill_service = SkillService(InMemoryInviteRepo())
+        skill_cog._refresh_panel = AsyncMock()
+        self.bot.cogs = {"skill": skill_cog}
+
+        async def create_role(name: str, **kwargs):
+            role = Mock()
+            role.name = name
+            role.members = [SimpleNamespace(id=1)]
+            role.delete = AsyncMock()
+            guild.roles.append(role)
+            return role
+
+        async def create_category(name: str, **kwargs):
+            cat = SimpleNamespace(
+                id=999,
+                name=name,
+                channels=[],
+                create_forum=AsyncMock(),
+                create_text_channel=AsyncMock(),
+                create_voice_channel=AsyncMock(),
+                delete=AsyncMock(),
+            )
+            guild.categories.append(cat)
+            return cat
+
+        guild.create_role = AsyncMock(side_effect=create_role)
+        guild.create_category = AsyncMock(side_effect=create_category)
+
+        created = await self.client.post(
+            "/api/guilds/100/skills",
+            json={"name": "音樂術", "emoji": "🎵"},
+        )
+        self.assertEqual(created.status_code, 201)
+        skill_payload = created.json()["skill"]
+        self.assertEqual(skill_payload["name"], "音樂術")
+        self.assertEqual(skill_payload["emoji"], "🎵")
+        self.assertEqual(skill_payload["category_name"], "湯技：音樂術 🎵")
+        self.assertEqual(len(skill_payload["invite_code"]), 8)
+
+        listed = await self.client.get("/api/guilds/100/skills")
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(len(listed.json()["skills"]), 1)
+
+        old_code = skill_payload["invite_code"]
+        regenerated = await self.client.post("/api/guilds/100/skills/音樂術/regenerate-code")
+        self.assertEqual(regenerated.status_code, 200)
+        self.assertEqual(len(regenerated.json()["invite_code"]), 8)
+        self.assertNotEqual(regenerated.json()["invite_code"], old_code)
+
+        deleted = await self.client.delete("/api/guilds/100/skills/音樂術")
+        self.assertEqual(deleted.status_code, 204)
+        self.assertIsNone(codes.get("100:音樂術"))
 
     async def test_settings_rejects_unauthorized_and_unknown_values(self):
         self.authenticate()

@@ -96,6 +96,12 @@ uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py
 pnpm nx run web:dev
 ```
 
+只想調整 Web 畫面、不想登入或啟動 Bot 時，可用 Mock 模式（資料存在記憶體，重新整理即重置）：
+
+```powershell
+pnpm run web:mock   # http://localhost:5173 ，自動進入 Mock 伺服器的編輯畫面
+```
+
 本機開發時，將 `DISCORD_REDIRECT_URI` 設為
 `http://localhost:5173/api/auth/callback`。正式環境必須使用 HTTPS，並設定
 `SESSION_COOKIE_SECURE=true`。
@@ -294,7 +300,7 @@ discord-channel-bot/
 | `SKILL_PREFIX` | — | 依語系 | 湯技分類前綴 |
 | `SKILL_PANEL_CHANNEL` | — | 依語系 | 湯技與開房共用入口名稱，繁中預設「🎯｜社群入口」 |
 | `PARTY_NOTIFICATION_CHANNEL` | — | 依語系 | 共用入口同分類的分享通知頻道，繁中預設「📣｜揪團通知」 |
-| `SKILL_PANEL_DIRECT_JOIN_SKILLS` | — | `鍛造術,遊戲術,墨繪術,幻想術` | `/skill panel` 未指定 direct_join_skills 時，預設可按鈕直接加入的湯技清單 |
+| `SKILL_PANEL_DIRECT_JOIN_SKILLS` | — | `鍛造術,遊戲術,墨繪術` | `/skill panel` 未指定 direct_join_skills 時，預設可按鈕直接加入的湯技清單 |
 | `LEVELING_DB_PATH` | — | `data/leveling.db` | 等級資料庫檔案路徑 |
 | `XP_PER_MESSAGE_MIN` | — | `15` | 每則訊息最低 XP |
 | `XP_PER_MESSAGE_MAX` | — | `25` | 每則訊息最高 XP |

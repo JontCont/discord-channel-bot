@@ -7,22 +7,26 @@ from cogs.repository.guild_settings_db import GuildSettingsDB
 
 @dataclass(frozen=True, slots=True)
 class GuildSettings:
+    auto_voice_enabled: bool = True
     auto_voice_trigger: str = config.AUTO_VOICE_TRIGGER
     auto_voice_suffix: str = config.AUTO_VOICE_SUFFIX
     auto_voice_limit: int = config.AUTO_VOICE_LIMIT
 
+    private_rooms_enabled: bool = True
     private_category: str = config.PRIVATE_CATEGORY
     private_trigger: str = config.PRIVATE_TRIGGER
     private_suffix: str = config.PRIVATE_SUFFIX
     private_limit: int = config.PRIVATE_LIMIT
     password_channel: str = config.PASSWORD_CHANNEL
 
+    skills_enabled: bool = True
     skill_prefix: str = config.SKILL_PREFIX
     skill_panel_channel: str = config.SKILL_PANEL_CHANNEL
     skill_panel_direct_join_skills: tuple[str, ...] = tuple(
         config.SKILL_PANEL_DIRECT_JOIN_SKILLS
     )
-    party_category: str = config.PARTY_CATEGORY
+    party_enabled: bool = True
+    party_notification_channel: str = config.PARTY_NOTIFICATION_CHANNEL
     party_panel_title: str = "🏠 房間大廳"
     party_panel_description: str = (
         "想聊天、玩遊戲或找同好？選擇分類就能建立公開語音房，不必先加入遊戲湯技。\n"
@@ -46,6 +50,7 @@ class GuildSettings:
     )
     skill_panel_footer: str = "💡 其餘湯技需向邀請人取得邀請碼，再使用 /skill join 加入。"
 
+    leveling_enabled: bool = True
     xp_per_message_min: int = config.XP_PER_MESSAGE_MIN
     xp_per_message_max: int = config.XP_PER_MESSAGE_MAX
     xp_message_cooldown: int = config.XP_MESSAGE_COOLDOWN
@@ -79,6 +84,15 @@ class GuildSettingsService:
         "skill_panel_footer": 2048,
     }
     _FIELD_NAMES = frozenset(field.name for field in fields(GuildSettings))
+    _BOOLEAN_NAMES = frozenset(
+        {
+            "auto_voice_enabled",
+            "private_rooms_enabled",
+            "skills_enabled",
+            "party_enabled",
+            "leveling_enabled",
+        }
+    )
     _REQUIRED_NAMES = frozenset(
         {
             "auto_voice_trigger",
@@ -89,7 +103,7 @@ class GuildSettingsService:
             "password_channel",
             "skill_prefix",
             "skill_panel_channel",
-            "party_category",
+            "party_notification_channel",
             "levelup_channel",
         }
     )
@@ -137,11 +151,8 @@ class GuildSettingsService:
     @classmethod
     def _build(cls, values: Mapping[str, Any]) -> GuildSettings:
         normalized = dict(values)
-        legacy_party_skill = normalized.pop("party_skill", None)
-        if "party_category" not in normalized and isinstance(legacy_party_skill, str):
-            normalized["party_category"] = legacy_party_skill
-        if normalized.get("party_category") == "遊戲術":
-            normalized["party_category"] = config.PARTY_CATEGORY
+        normalized.pop("party_skill", None)
+        normalized.pop("party_category", None)
 
         unknown = set(normalized) - cls._FIELD_NAMES
         if unknown:
@@ -184,6 +195,11 @@ class GuildSettingsService:
             settings.skill_panel_title, settings.skill_panel_description, settings.skill_panel_footer,
         ))) > 6000:
             raise ValueError("skill panel text must not exceed 6000 characters in total")
+        for name in cls._BOOLEAN_NAMES:
+            value = getattr(settings, name)
+            if not isinstance(value, bool):
+                raise ValueError(f"{name} must be a boolean")
+
         for name in cls._REQUIRED_NAMES:
             value = getattr(settings, name)
             if not isinstance(value, str) or not value.strip():

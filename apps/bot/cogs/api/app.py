@@ -11,7 +11,9 @@ import httpx
 import discord as discord_api
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+from cogs.repository.skill_invite_repository import SkillInviteRepository
 from cogs.service.guild_settings_service import GuildSettingsService
+from cogs.service.skill_service import SkillService
 from cogs.slash.party import PartyCommands
 from cogs.slash.skill_commands import SkillCommands
 
@@ -420,6 +422,222 @@ def create_api(
             for category in guild.categories
         ]
         return {"categories": categories}
+
+    @app.get("/api/guilds/{guild_id}/channels")
+    async def get_channels(
+        guild_id: int,
+        auth: AuthenticatedSession = Depends(require_session),
+    ) -> dict[str, Any]:
+        await require_guild(guild_id, auth)
+        guild = discord_bot.get_guild(guild_id)
+        channels = [
+            {
+                "id": str(channel.id),
+                "name": channel.name,
+                "category": getattr(getattr(channel, "category", None), "name", None),
+            }
+            for channel in getattr(guild, "text_channels", [])
+        ]
+        return {"channels": channels}
+
+    fallback_skill_service: SkillService | None = None
+
+    def get_skill_service() -> SkillService:
+        nonlocal fallback_skill_service
+        skill_cog = discord_bot.get_cog("skill")
+        service = getattr(skill_cog, "skill_service", None)
+        if isinstance(service, SkillService):
+            return service
+        if fallback_skill_service is None:
+            fallback_skill_service = SkillService(SkillInviteRepository())
+        return fallback_skill_service
+
+    def serialize_skill(
+        guild: Any,
+        settings: Any,
+        skill_service: SkillService,
+        skill_name: str,
+        emoji: str | None,
+    ) -> dict[str, Any]:
+        prefix = getattr(settings, "skill_prefix", "湯技：")
+        direct_skills = tuple(getattr(settings, "skill_panel_direct_join_skills", ()))
+        category = skill_service.find_category(guild, skill_name, prefix)
+        role = (
+            skill_service.find_role(guild, skill_name, prefix, emoji)
+            if hasattr(guild, "roles")
+            else None
+        )
+        member_count = len(getattr(role, "members", [])) if role else 0
+        invite_code = skill_service.ensure_invite_code(guild.id, skill_name)
+        return {
+            "name": skill_name,
+            "emoji": emoji,
+            "category_name": (
+                category.name
+                if category
+                else skill_service.skill_category_name(skill_name, prefix, emoji)
+            ),
+            "role_name": role.name if role else f"{prefix}{skill_name}",
+            "member_count": member_count,
+            "invite_code": invite_code,
+            "direct_join": skill_name in direct_skills,
+        }
+
+    @app.get("/api/guilds/{guild_id}/skills")
+    async def get_skills(
+        guild_id: int,
+        auth: AuthenticatedSession = Depends(require_session),
+    ) -> dict[str, Any]:
+        await require_guild(guild_id, auth)
+        guild = discord_bot.get_guild(guild_id)
+        settings = await settings_service.get(guild_id)
+        prefix = getattr(settings, "skill_prefix", "湯技：")
+        skill_service = get_skill_service()
+        skills = [
+            serialize_skill(guild, settings, skill_service, name, emoji)
+            for name, emoji in skill_service.get_skills(guild, prefix)
+        ]
+        return {"skills": skills}
+
+    @app.post("/api/guilds/{guild_id}/skills", status_code=status.HTTP_201_CREATED)
+    async def create_skill(
+        guild_id: int,
+        payload: dict[str, Any] = Body(...),
+        auth: AuthenticatedSession = Depends(require_session),
+    ) -> dict[str, Any]:
+        await require_guild(guild_id, auth)
+        raw_name = payload.get("name")
+        raw_emoji = payload.get("emoji")
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Skill name is required",
+            )
+        name = raw_name.strip()
+        if " " in name:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Skill name cannot contain spaces",
+            )
+        emoji = raw_emoji.strip() if isinstance(raw_emoji, str) and raw_emoji.strip() else None
+
+        guild = discord_bot.get_guild(guild_id)
+        settings = await settings_service.get(guild_id)
+        prefix = getattr(settings, "skill_prefix", "湯技：")
+        auto_voice_trigger = getattr(settings, "auto_voice_trigger", "➕ 點我開房")
+        skill_service = get_skill_service()
+
+        if skill_service.find_category(guild, name, prefix):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"湯技「{name}」已經存在",
+            )
+
+        role_name = name if name.startswith(prefix) else f"{prefix}{name}"
+        try:
+            role = await guild.create_role(
+                name=role_name,
+                colour=SkillCommands._auto_skill_role_color(name),
+                mentionable=True,
+                reason="Skill create via Web console",
+            )
+            overwrites = skill_service.skill_overwrites(guild, role)
+            category_name = skill_service.skill_category_name(name, prefix, emoji)
+            category = await guild.create_category(
+                name=category_name,
+                overwrites=overwrites,
+                reason="Skill create via Web console",
+            )
+            await category.create_forum(f"{name}-討論")
+            await category.create_text_channel(f"{name}-聊天")
+            await category.create_voice_channel(auto_voice_trigger)
+            skill_service.set_invite_code(guild_id, name)
+
+            skill_cog = discord_bot.get_cog("skill")
+            if isinstance(skill_cog, SkillCommands):
+                await skill_cog._refresh_panel(guild, settings)
+        except discord_api.HTTPException as exc:
+            logger.exception("Failed to create skill %s in guild %s", name, guild_id)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to create skill in Discord: {exc}",
+            ) from None
+
+        return {"skill": serialize_skill(guild, settings, skill_service, name, emoji)}
+
+    @app.post("/api/guilds/{guild_id}/skills/{skill_name}/regenerate-code")
+    async def regenerate_skill_code(
+        guild_id: int,
+        skill_name: str,
+        auth: AuthenticatedSession = Depends(require_session),
+    ) -> dict[str, Any]:
+        await require_guild(guild_id, auth)
+        name = skill_name.strip()
+        guild = discord_bot.get_guild(guild_id)
+        settings = await settings_service.get(guild_id)
+        prefix = getattr(settings, "skill_prefix", "湯技：")
+        skill_service = get_skill_service()
+
+        category = skill_service.find_category(guild, name, prefix)
+        role = (
+            skill_service.find_role(guild, name, prefix)
+            if hasattr(guild, "roles")
+            else None
+        )
+        if not category and not role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"找不到湯技「{name}」",
+            )
+
+        invite_code = skill_service.set_invite_code(guild_id, name)
+        return {"invite_code": invite_code}
+
+    @app.delete(
+        "/api/guilds/{guild_id}/skills/{skill_name}",
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
+    async def delete_skill(
+        guild_id: int,
+        skill_name: str,
+        auth: AuthenticatedSession = Depends(require_session),
+    ) -> None:
+        await require_guild(guild_id, auth)
+        name = skill_name.strip()
+        guild = discord_bot.get_guild(guild_id)
+        settings = await settings_service.get(guild_id)
+        prefix = getattr(settings, "skill_prefix", "湯技：")
+        skill_service = get_skill_service()
+
+        category = skill_service.find_category(guild, name, prefix)
+        if not category:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"找不到湯技「{name}」",
+            )
+
+        try:
+            for channel in list(getattr(category, "channels", [])):
+                await channel.delete(reason="Skill delete via Web console")
+            await category.delete(reason="Skill delete via Web console")
+            role = (
+                skill_service.find_role(guild, name, prefix)
+                if hasattr(guild, "roles")
+                else None
+            )
+            if role:
+                await role.delete(reason="Skill delete via Web console")
+            skill_service.delete_invite_code(guild_id, name)
+
+            skill_cog = discord_bot.get_cog("skill")
+            if isinstance(skill_cog, SkillCommands):
+                await skill_cog._refresh_panel(guild, settings)
+        except discord_api.HTTPException as exc:
+            logger.exception("Failed to delete skill %s in guild %s", name, guild_id)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to delete skill in Discord: {exc}",
+            ) from None
 
     @app.put("/api/guilds/{guild_id}/settings")
     async def update_settings(

@@ -11,6 +11,7 @@ import { PrivacyPolicyPage, TermsOfServicePage } from './ui/LegalPages'
 import { LoginScreen } from './ui/LoginScreen'
 import { SettingsPage } from './ui/SettingsPage'
 import { NotFound } from './ui/States'
+import { MOCK_GUILD_ID } from './mock-constants'
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -20,7 +21,12 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: () => <Navigate to="/guilds" replace />,
+  component: () =>
+    import.meta.env.VITE_MOCK === 'true' ? (
+      <Navigate to="/guilds/$guildId/settings" params={{ guildId: MOCK_GUILD_ID }} replace />
+    ) : (
+      <Navigate to="/guilds" replace />
+    ),
 })
 
 const loginRoute = createRoute({

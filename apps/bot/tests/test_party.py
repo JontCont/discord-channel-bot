@@ -29,7 +29,6 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         self.settings = SimpleNamespace(**{
             **GuildSettings().to_dict(),
             "skill_panel_channel": "🎯｜社群入口",
-            "party_category": "湯技：遊戲術 🎮",
             "skill_prefix": "湯技：",
             "private_category": "🔒 私人湯",
         })
@@ -51,7 +50,7 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         self.guild.roles = [self.guild.default_role, self.skill_role, self.level_role]
         self.category = Mock(spec=discord.CategoryChannel)
         self.category.id = 11
-        self.category.name = self.settings.party_category
+        self.category.name = "湯技：遊戲術 🎮"
         self.category.permissions_for.return_value = self.permissions
         self.guild.categories = [self.category]
         self.general = Mock(spec=discord.CategoryChannel)
@@ -186,9 +185,7 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(overwrite.view_channel)
         self.assertTrue(overwrite.connect)
         self.assertEqual(list(overwrites), [self.guild.default_role])
-        kwargs = self.notification.send.call_args.kwargs
-        self.assertIsNone(kwargs["content"])
-        self.assertEqual(kwargs["allowed_mentions"].roles, [])
+        self.notification.send.assert_not_awaited()
         self.assertEqual(
             self.bot.room_registry.register.call_args.kwargs["party"]["notify_role_ids"], []
         )
@@ -372,8 +369,23 @@ class CommunityRoomTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("view", message.reply.call_args.kwargs)
 
     async def submit(self):
+        modal = self.modal()
+        modal.notify_roles._values = ["100"]
         with patch.object(config, "DYNAMIC_VOICE_CREATE_ENABLED", True):
-            await self.modal().on_submit(self.interaction)
+            await modal.on_submit(self.interaction)
+
+    async def test_notification_uses_configured_channel_id(self):
+        custom_channel = Mock(spec=discord.TextChannel)
+        custom_channel.id = 999888
+        custom_channel.guild = self.guild
+        custom_channel.send = AsyncMock()
+        custom_channel.permissions_for.return_value = self.permissions
+        custom_channel.mention = "<#999888>"
+        self.settings.party_notification_channel = "999888"
+        self.guild.get_channel.side_effect = lambda cid: custom_channel if cid == 999888 else self.room
+        await self.submit()
+        custom_channel.send.assert_awaited_once()
+        self.notification.send.assert_not_awaited()
 
     async def test_missing_notification_channel_still_creates_room_with_warning(self):
         self.general.text_channels = [self.entry]

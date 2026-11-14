@@ -31,6 +31,11 @@ class SkillToggleButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         settings = await self._bot.guild_settings_service.get(interaction.guild_id)
+        if not getattr(settings, "skills_enabled", True):
+            await interaction.response.send_message(
+                "🚫 此伺服器目前未啟用湯技系統。", ephemeral=True
+            )
+            return
         role = self._service.find_role(
             interaction.guild,
             self.skill_name,
