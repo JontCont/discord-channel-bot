@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cogs.service.room_registry import RoomRegistry
+from service.room_registry import RoomRegistry
 
 
 class RoomRegistryTests(unittest.TestCase):
@@ -58,7 +58,7 @@ class RoomRegistryTests(unittest.TestCase):
             path = Path(directory) / "rooms.json"
             path.write_text("not-json", encoding="utf-8")
 
-            with self.assertLogs("cogs.service.room_registry", level="ERROR"):
+            with self.assertLogs("service.room_registry", level="ERROR"):
                 registry = RoomRegistry(path)
 
             self.assertEqual(registry.entries(), ())

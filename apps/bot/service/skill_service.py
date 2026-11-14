@@ -2,8 +2,8 @@ import secrets
 
 import discord
 
-from cogs.repository.skill_invite_repository import SkillInviteRepository
-from cogs.service.guild_settings_service import GuildSettings
+from models.guild_settings import GuildSettings
+from repository.skill_invite_repository import SkillInviteRepository
 
 
 class SkillService:

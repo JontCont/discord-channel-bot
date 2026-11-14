@@ -11,9 +11,9 @@ import httpx
 import discord as discord_api
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
-from cogs.repository.skill_invite_repository import SkillInviteRepository
-from cogs.service.guild_settings_service import GuildSettingsService
-from cogs.service.skill_service import SkillService
+from repository.skill_invite_repository import SkillInviteRepository
+from service.guild_settings_service import GuildSettingsService
+from service.skill_service import SkillService
 from cogs.slash.party import PartyCommands
 from cogs.slash.skill_commands import SkillCommands
 

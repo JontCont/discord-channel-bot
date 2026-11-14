@@ -2,8 +2,9 @@ import json
 import unittest
 
 import config
-from cogs.repository.guild_settings_db import GuildSettingsDB
-from cogs.service.guild_settings_service import GuildSettings, GuildSettingsService
+from models.guild_settings import GuildSettings
+from repository.guild_settings_db import GuildSettingsDB
+from service.guild_settings_service import GuildSettingsService
 
 
 class GuildSettingsServiceTests(unittest.IsolatedAsyncioTestCase):

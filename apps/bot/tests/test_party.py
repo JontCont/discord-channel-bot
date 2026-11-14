@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, Mock, patch
 import discord
 
 import config
-from cogs.service.panel_service import upsert_panel
-from cogs.service.guild_settings_service import GuildSettings
+from models.guild_settings import GuildSettings
+from service.panel_service import upsert_panel
 from cogs.slash.party import (
     PartyCommands,
     PartyCreateModal,

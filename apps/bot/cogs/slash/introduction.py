@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
-from cogs.repository.introduction_db import IntroductionDB
+from repository.introduction_db import IntroductionDB
 
 
 logger = logging.getLogger(__name__)

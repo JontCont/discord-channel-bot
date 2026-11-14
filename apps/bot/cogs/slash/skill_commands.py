@@ -2,10 +2,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.repository.skill_invite_repository import SkillInviteRepository
-from cogs.service.guild_settings_service import GuildSettings
-from cogs.service.skill_service import SkillService
-from cogs.service.panel_service import upsert_panel
+from models.guild_settings import GuildSettings
+from repository.skill_invite_repository import SkillInviteRepository
+from service.panel_service import upsert_panel
+from service.skill_service import SkillService
 
 
 class SkillToggleButton(discord.ui.Button):

@@ -8,9 +8,9 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
-from cogs.service.panel_service import upsert_panel
-from cogs.service.guild_settings_service import GuildSettings
-from cogs.service.skill_service import SkillService
+from models.guild_settings import GuildSettings
+from service.panel_service import upsert_panel
+from service.skill_service import SkillService
 
 
 logger = logging.getLogger(__name__)

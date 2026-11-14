@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.service.guild_settings_service import GuildSettings
+from models.guild_settings import GuildSettings
 from config import BOT_PREFIX
 
 

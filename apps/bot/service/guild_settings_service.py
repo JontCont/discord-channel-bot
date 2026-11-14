@@ -1,122 +1,22 @@
-from dataclasses import asdict, dataclass, fields
+from dataclasses import fields
 from typing import Any, Mapping
 
-import config
-from cogs.repository.guild_settings_db import GuildSettingsDB
-
-
-@dataclass(frozen=True, slots=True)
-class GuildSettings:
-    auto_voice_enabled: bool = True
-    auto_voice_trigger: str = config.AUTO_VOICE_TRIGGER
-    auto_voice_suffix: str = config.AUTO_VOICE_SUFFIX
-    auto_voice_limit: int = config.AUTO_VOICE_LIMIT
-
-    private_rooms_enabled: bool = True
-    private_category: str = config.PRIVATE_CATEGORY
-    private_trigger: str = config.PRIVATE_TRIGGER
-    private_suffix: str = config.PRIVATE_SUFFIX
-    private_limit: int = config.PRIVATE_LIMIT
-    password_channel: str = config.PASSWORD_CHANNEL
-
-    skills_enabled: bool = True
-    skill_prefix: str = config.SKILL_PREFIX
-    skill_panel_channel: str = config.SKILL_PANEL_CHANNEL
-    skill_panel_direct_join_skills: tuple[str, ...] = tuple(
-        config.SKILL_PANEL_DIRECT_JOIN_SKILLS
-    )
-    party_enabled: bool = True
-    party_notification_channel: str = config.PARTY_NOTIFICATION_CHANNEL
-    party_panel_title: str = "🏠 房間大廳"
-    party_panel_description: str = (
-        "想聊天、玩遊戲或找同好？選擇分類就能建立公開語音房，不必先加入遊戲湯技。\n"
-        "表單填寫房名、人數、備註，並可多選自己已加入的湯技作為通知身分。\n"
-        "送出表單後，Bot 會自動在揪團通知頻道公告，並標記你選的湯技身分。\n"
-        "所有人離開後自動清理房間。"
-    )
-    party_panel_create_heading: str = "建立房間"
-    party_panel_create_description: str = "選擇建立分類，填寫房名、人數、備註與通知身分（可多選）。"
-    party_panel_list_heading: str = "查看房間"
-    party_panel_list_description: str = "先加入任一語音頻道，再從即時列表選擇揪團，Bot 會直接移動你。"
-    party_panel_create_label: str = "建立房間"
-    party_panel_list_label: str = "查看房間"
-    skill_panel_title: str = "🎯 選擇你的湯技"
-    skill_panel_description: str = (
-        "「湯技」就是這裡的**興趣分組**，幫你找到有共同興趣的同好。\n"
-        "加入後會取得對應身分組，並看見該分組的聊天、討論與語音頻道。\n\n"
-        "**怎麼加入？**\n"
-        "選擇感興趣的湯技，點下方按鈕即可加入，**可以同時加入多個**。\n"
-        "已加入的湯技再點一次就會離開，並收起對應的專屬頻道。"
-    )
-    skill_panel_footer: str = "💡 其餘湯技需向邀請人取得邀請碼，再使用 /skill join 加入。"
-
-    leveling_enabled: bool = True
-    xp_per_message_min: int = config.XP_PER_MESSAGE_MIN
-    xp_per_message_max: int = config.XP_PER_MESSAGE_MAX
-    xp_message_cooldown: int = config.XP_MESSAGE_COOLDOWN
-    xp_per_voice_tick: int = config.XP_PER_VOICE_TICK
-    xp_voice_interval: int = config.XP_VOICE_INTERVAL
-    xp_daily_base: int = config.XP_DAILY_BASE
-    levelup_channel: str = config.LEVELUP_CHANNEL
-    level_roles: tuple[tuple[int, str, int], ...] = tuple(config.LEVEL_ROLES)
-
-    def to_dict(self) -> dict[str, Any]:
-        data = asdict(self)
-        data["skill_panel_direct_join_skills"] = list(
-            self.skill_panel_direct_join_skills
-        )
-        data["level_roles"] = [list(role) for role in self.level_roles]
-        return data
+from repository.guild_settings_db import GuildSettingsDB
+from core.constants.limits import (
+    BOOLEAN_FIELDS,
+    INTEGER_RANGES,
+    PANEL_TEXT_LIMITS,
+    REQUIRED_STRING_FIELDS,
+)
+from models.guild_settings import GuildSettings
 
 
 class GuildSettingsService:
-    PANEL_TEXT_LIMITS = {
-        "party_panel_title": 256,
-        "party_panel_description": 4096,
-        "party_panel_create_heading": 256,
-        "party_panel_create_description": 1024,
-        "party_panel_list_heading": 256,
-        "party_panel_list_description": 1024,
-        "party_panel_create_label": 80,
-        "party_panel_list_label": 80,
-        "skill_panel_title": 256,
-        "skill_panel_description": 4096,
-        "skill_panel_footer": 2048,
-    }
+    PANEL_TEXT_LIMITS = PANEL_TEXT_LIMITS
     _FIELD_NAMES = frozenset(field.name for field in fields(GuildSettings))
-    _BOOLEAN_NAMES = frozenset(
-        {
-            "auto_voice_enabled",
-            "private_rooms_enabled",
-            "skills_enabled",
-            "party_enabled",
-            "leveling_enabled",
-        }
-    )
-    _REQUIRED_NAMES = frozenset(
-        {
-            "auto_voice_trigger",
-            "auto_voice_suffix",
-            "private_category",
-            "private_trigger",
-            "private_suffix",
-            "password_channel",
-            "skill_prefix",
-            "skill_panel_channel",
-            "party_notification_channel",
-            "levelup_channel",
-        }
-    )
-    _INTEGER_RANGES = {
-        "auto_voice_limit": (0, 99),
-        "private_limit": (0, 99),
-        "xp_per_message_min": (0, None),
-        "xp_per_message_max": (0, None),
-        "xp_message_cooldown": (0, None),
-        "xp_per_voice_tick": (0, None),
-        "xp_voice_interval": (1, None),
-        "xp_daily_base": (0, None),
-    }
+    _BOOLEAN_NAMES = BOOLEAN_FIELDS
+    _REQUIRED_NAMES = REQUIRED_STRING_FIELDS
+    _INTEGER_RANGES = INTEGER_RANGES
 
     def __init__(self, db: GuildSettingsDB):
         self._db = db

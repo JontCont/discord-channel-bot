@@ -285,8 +285,10 @@ class AutoVoice(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    from cogs.service.room_registry import RoomRegistry
+    if hasattr(bot, "container"):
+        bot.room_registry = bot.container.room_registry
+    elif not hasattr(bot, "room_registry"):
+        from service.room_registry import RoomRegistry
 
-    if not hasattr(bot, "room_registry"):
         bot.room_registry = RoomRegistry()
     await bot.add_cog(AutoVoice(bot))

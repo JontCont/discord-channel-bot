@@ -24,14 +24,13 @@
                                              ]
                              },
                     "compile":  {
-                                    "command":  "python -m compileall -q apps/bot/bot.py apps/bot/config.py apps/bot/cogs",
+                                    "command":  "python -m compileall -q apps/bot",
                                     "cache":  true,
                                     "inputs":  [
                                                    "pythonSources"
                                                ],
                                     "outputs":  [
-                                                    "{projectRoot}/__pycache__/**/*",
-                                                    "{projectRoot}/cogs/**/__pycache__/**/*"
+                                                    "{projectRoot}/__pycache__/**/*"
                                                 ]
                                 },
                     "docker-dev":  {

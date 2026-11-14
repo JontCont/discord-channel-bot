@@ -14,9 +14,9 @@ HAS_API_DEPENDENCIES = all(
 if HAS_API_DEPENDENCIES:
     import httpx
 
-    from cogs.api import ApiConfig, create_api
-    from cogs.api.app import SESSION_COOKIE
-    from cogs.service.skill_service import SkillService
+    from api import ApiConfig, create_api
+    from api.app import SESSION_COOKIE
+    from service.skill_service import SkillService
     from cogs.slash.party import PartyCommands
     from cogs.slash.skill_commands import SkillCommands
 
@@ -258,7 +258,7 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         party._refresh_panel = AsyncMock(side_effect=RuntimeError("Panel unavailable"))
         self.bot.cogs = {"skill": skill, "party": party}
         self.bot.get_guild(100).text_channels = [SimpleNamespace(name="skills")]
-        with self.assertLogs("cogs.api.app", level="ERROR"):
+        with self.assertLogs("api.app", level="ERROR"):
             failed = await self.client.put(
                 "/api/guilds/100/settings", json={"skill_panel_title": "My interests"},
             )

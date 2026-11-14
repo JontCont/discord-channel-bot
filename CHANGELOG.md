@@ -6,6 +6,22 @@
 再依 `feature`、`bug`、`chore`、`docs`、
 `refactor`、`test` 分類。分類使用 `### 分類`，只保留有內容的分類。
 
+## 2026-11-14 - 02
+
+重構後端為 Clean Layered Architecture，解耦資料存取、業務服務、API 表現層與配置邊界
+
+### refactor
+
+- 重構 apps/bot 為標準分層架構（Clean Architecture），將資料存取（DAL）升格為 apps/bot/repository/，業務領域邏輯抽離為 apps/bot/service/，FastAPI 路由模組化為 apps/bot/api/，落實單一職責原則。
+- 實作 ServiceContainer（apps/bot/core/container.py），統一組裝與管理 Repository 與 Service 單例生命週期，消除各模組各自初始化資料庫與服務的重複邏輯。
+- 解耦配置與執行代碼：建立 apps/bot/core/enums.py（以 PEP 435 StrEnum 定義 FeatureModule 與 VoiceRoomType）、apps/bot/core/constants/limits.py（PEP 591 Final 邊界常數）與 apps/bot/models/guild_settings.py（PEP 557 原生不可變資料模型），徹底將設定字典與面板文字從業務方法中分離。
+- 將 apps/bot/bot.py 瘦身為乾淨的 Composition Root，接入集中化日誌（core.logging）與全域錯誤防禦管線（core.error_handler）。
+- 徹底清理 apps/bot/cogs 目錄，全面移除 cogs/api/、cogs/repository/ 與 cogs/service/ 舊有殘留，使 cogs 僅專注於 Discord 表現層控制器（cogs/prefix/ 與 cogs/slash/）。
+
+### docs
+
+- 建立 specs/clean-architecture-refactor.md，依據 SDD（Spec-Driven Development）流程依序記錄純模型抽離、資料存取升格、業務服務瘦身、DI 容器裝配、API 模組化與全面驗證之任務順序與驗收狀態。
+
 ## 2026-11-14 - 01
 
 新增 Web Mock 環境、模組化後台介面與湯技／揪團通知管理功能

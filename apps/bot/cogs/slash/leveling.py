@@ -10,8 +10,8 @@ from discord.ext import commands, tasks
 logger = logging.getLogger("bot.leveling")
 
 from config import LEVELING_DB_PATH
-from cogs.repository.leveling_db import LevelingDB
-from cogs.service.guild_settings_service import GuildSettings
+from models.guild_settings import GuildSettings
+from repository.leveling_db import LevelingDB
 
 
 def _progress_bar(current: int, total: int, length: int = 16) -> str:

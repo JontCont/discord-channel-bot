@@ -1,12 +1,16 @@
+"""
+Bot Bootstrap & Composition Root.
+
+官方依據: PEP 8, PEP 257 & Clean Architecture (Robert C. Martin).
+負責系統生命週期初始化、裝配 DI 容器、啟動 API 與 Discord Bot。
+"""
 import asyncio
 import logging
 import discord
 import uvicorn
 from discord.ext import commands
 
-from cogs.api import create_api
-from cogs.repository.guild_settings_db import GuildSettingsDB
-from cogs.service.guild_settings_service import GuildSettingsService
+from api import create_api
 from config import (
     API_HOST,
     API_PORT,
@@ -17,13 +21,12 @@ from config import (
     DYNAMIC_VOICE_DELETE_ENABLED,
     GUILD_ID,
     PRIVATE_TRIGGER,
-    SETTINGS_DB_PATH,
 )
+from core.container import ServiceContainer
+from core.error_handler import handle_command_error
+from core.logging import setup_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+setup_logging()
 logger = logging.getLogger("bot")
 
 intents = discord.Intents.default()
@@ -50,7 +53,7 @@ COGS = [
 ]
 
 
-def _validate_config():
+def _validate_config() -> None:
     """Fail fast if configurable trigger names collide."""
     if AUTO_VOICE_TRIGGER == PRIVATE_TRIGGER:
         raise ValueError(
@@ -60,7 +63,8 @@ def _validate_config():
 
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
+    """Discord Gateway 連線就緒事件。"""
     logger.info("Bot is online as %s (ID: %s)", bot.user, bot.user.id)
     try:
         if GUILD_ID:
@@ -76,36 +80,36 @@ async def on_ready():
 
 
 @bot.event
-async def on_command_error(ctx: commands.Context, error: commands.CommandError):
-    if isinstance(error, commands.CommandNotFound):
-        return
-    if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"⚠️ 缺少參數: `{error.param.name}`")
-        return
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("🚫 你沒有權限執行此指令。")
-        return
-    logger.error("Unhandled error in command %s: %s", ctx.command, error)
-    await ctx.send("❌ 發生未預期的錯誤，請稍後再試。")
+async def on_command_error(ctx: commands.Context, error: commands.CommandError) -> None:
+    """委派給核心錯誤處理管線。"""
+    await handle_command_error(ctx, error)
 
 
-async def main():
+async def main() -> None:
+    """應用程式 Composition Root 進入點。"""
     _validate_config()
     logger.info(
         "Dynamic voice operations: create=%s, delete=%s",
         DYNAMIC_VOICE_CREATE_ENABLED,
         DYNAMIC_VOICE_DELETE_ENABLED,
     )
-    settings_db = GuildSettingsDB(SETTINGS_DB_PATH)
-    await settings_db.init()
-    bot.guild_settings_service = GuildSettingsService(settings_db)
 
+    # 1. 裝配與初始化 DI 容器 (Composition Root)
+    container = ServiceContainer.create()
+    await container.init()
+
+    # 綁定至 bot 物件供 Cogs 與表現層存取
+    bot.container = container
+    bot.guild_settings_service = container.guild_settings_service
+
+    # 2. 建立並啟動 FastAPI 管理後台
     api = create_api(bot.guild_settings_service, bot)
     api_server = uvicorn.Server(
         uvicorn.Config(api, host=API_HOST, port=API_PORT, log_level="info")
     )
     api_task = asyncio.create_task(api_server.serve())
 
+    # 3. 載入 Discord Cogs 並啟動 Bot
     async with bot:
         try:
             for cog in COGS:
@@ -118,7 +122,7 @@ async def main():
         finally:
             api_server.should_exit = True
             await api_task
-            await settings_db.close()
+            await container.close()
 
 
 if __name__ == "__main__":

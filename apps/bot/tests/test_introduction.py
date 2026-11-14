@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import discord
 
-from cogs.repository.introduction_db import IntroductionDB
+from repository.introduction_db import IntroductionDB
 from cogs.slash.introduction import Introduction, IntroductionModal
 
 
