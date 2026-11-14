@@ -1,8 +1,10 @@
 # 🤖 Discord Channel Bot
 
+**繁體中文** · [English](README.en.md)
+
 一個功能豐富的 Discord 機器人，使用 [discord.py](https://github.com/Rapptz/discord.py) 建立，採用 Cogs 模組化架構。支援自動語音頻道、私人包廂、湯技角色系統、活躍值等級系統等實用功能，讓你的伺服器管理更輕鬆！
 
-> **Python 3.10+** · **discord.py ≥ 2.7.1** · **支援 Docker 部署**
+> **Python 3.10+** · **discord.py ≥ 2.7.1** · **React/Vite 設定後台** · **Nx + pnpm** · **支援 Docker 部署**
 
 ---
 
@@ -115,7 +117,7 @@ pnpm nx run web:build
 
 ### NAS Docker 啟動
 
-NAS 只需要 `docker-compose.yml` 與 `.env`，不需要上傳 source code。先建立
+NAS 只需要 [`docker/docker-compose.yml`](docker/docker-compose.yml)（複製到 NAS 同一個資料夾）與 `.env`，不需要上傳 source code。先建立
 `data`、`logs` 目錄，再拉取 GHCR images 並啟動：
 
 ```bash
@@ -141,7 +143,7 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-std
 Pipeline 依變更檔案選擇建置目標：
 
 - `apps/web/**` 或 Web 共用建置設定（`package.json`、pnpm lockfile/workspace、
-  `nx.json`、`tsconfig.base.json`、`.dockerignore`）：只建置 Web，不執行 Bot CI。
+  `nx.json`、`tsconfig.base.json`、`apps/web/Dockerfile.dockerignore`）：只建置 Web，不執行 Bot CI。
 - `apps/bot/**`：只執行 Bot CI 並建置 Bot。
 - 兩邊都有變更或修改 `.github/workflows/cicd.yml`／`build-image.yml`／
   `deploy-image.yml`：建置兩個 image。
@@ -178,19 +180,20 @@ Webhook 觸發後即完成該步驟，NAS 部署或重啟過程的異常由 n8n 
 ### 每次提交的更新紀錄
 
 每個新進的非 merge commit（包含純文件修改）都必須更新
-[`changes.md`](changes.md) 最上方的最新紀錄。使用 `## YYYY-MM-DD - NN - 摘要`（不加 `Build`）
-作為標題，再用 `### feature`、`### bug`、`### chore`、`### docs`、
+[`CHANGELOG.md`](CHANGELOG.md) 最上方的最新紀錄。使用 `## YYYY-MM-DD - NN`（不加 `Build`）
+作為標題，標題下一行寫 description（摘要說明），再用 `### feature`、`### bug`、`### chore`、`### docs`、
 `### refactor`、`### test` 分組。只保留有內容的分類，每個分類至少一個非空的
 `- ` 項目，不能重複分類；舊紀錄保留在下方。
 同一天從 `00`、`01` 依序編號，隔天重設為 `00`，最新放在最上方。
 日期依使用者本地日期填寫；編號跟隨更新紀錄，不是 `github.run_number`，重跑 CI
 不會新增編號。CI 會檢查日期排序、編號重複及缺號。
-原有的 [`CHANGELOG.md`](CHANGELOG.md) 保留為歷史版本日誌。
+早期的 1.x 版本紀錄已轉為相同格式，收在 [`CHANGELOG.md`](CHANGELOG.md) 最下方。
 
 CI 會逐一檢查 push／Pull Request 範圍內的非 merge commit；沒有更新檔案、
 刪除檔案或只修改舊紀錄都會阻擋建置。新分支首次 push（沒有前一個 SHA）只檢查
 最新的非 merge commit；手動執行與版本標籤只驗證最新紀錄格式。
-Discord 通知直接讀取最上方的最新紀錄，不再從 commit 訊息組合更新內容。
+Discord 通知直接讀取最上方的最新紀錄，不再從 commit 訊息組合更新內容。因 Discord embed 不顯示
+Markdown 標題，送出時會將 `##` 轉為粗體、`###` 轉為【分類】。
 
 可請 Copilot 使用專案內的
 [`update-changes` Skill](.github/skills/update-changes/SKILL.md) 協助補寫；
@@ -204,12 +207,19 @@ python -m unittest discover -s .github/scripts -p test_changes.py
 python .github/scripts/changes.py check --base BASE_SHA --head HEAD_SHA
 ```
 
-### 本機 Docker 建置
+### Docker 指令（pnpm / Nx）
 
-完整 source code 環境可使用本機 Compose 自行建置 images：
+Compose 檔放在 [`docker/`](docker/)，以下指令會以專案根目錄為基準執行（`.env`、`data`、`logs` 皆在根目錄）。
+同樣的指令也在 Nx Console 的 `bot` 專案下以 `docker-dev`、`docker-prod` 等 targets 提供：
 
 ```powershell
-docker compose -f docker-compose.local.yml up -d --build
+pnpm run docker:dev        # 本機從 source code 建置並啟動（docker/docker-compose.local.yml）
+pnpm run docker:dev:down   # 停止並移除
+pnpm run docker:dev:logs   # 追蹤日誌
+
+pnpm run docker:prod       # 拉取 GHCR images 並啟動（docker/docker-compose.yml）
+pnpm run docker:prod:down
+pnpm run docker:prod:logs
 ```
 
 ---
@@ -218,6 +228,10 @@ docker compose -f docker-compose.local.yml up -d --build
 
 ```
 discord-channel-bot/
+├── .github/
+│   ├── workflows/            # CI/CD（cicd.yml、build-image.yml、deploy-image.yml）
+│   ├── scripts/              # 更新紀錄驗證（changes.py）與測試
+│   └── skills/update-changes # 更新 CHANGELOG.md 的 Skill
 ├── apps/
 │   ├── bot/
 │   │   ├── bot.py            # Bot 與 API 主程式入口
@@ -226,17 +240,20 @@ discord-channel-bot/
 │   │   ├── tests/            # Bot/API 單元測試
 │   │   ├── requirements.txt  # Python dependencies
 │   │   ├── Dockerfile
-│   │   └── project.json      # Nx bot project
-│   └── web/                  # React/Vite 設定後台
-├── data/                     # 資料目錄（等級資料庫）
+│   │   └── project.json      # Nx bot project（含 docker-* targets）
+│   └── web/                  # React/Vite 設定後台（含 Dockerfile、Dockerfile.dockerignore）
+├── docker/
+│   ├── docker-compose.yml        # 正式環境：使用 GHCR images
+│   ├── docker-compose.local.yml  # 本機：從 source code 建置
+│   └── docker-compose.base.yml   # 與 local 相同的基礎設定
+├── data/                     # 資料目錄（SQLite 資料庫）
 ├── logs/                     # Bot runtime logs
-├── docker-compose.yml        # Docker Compose 設定
+├── AGENTS.md                 # 協作與更新紀錄規範
+├── CHANGELOG.md              # 每次提交的更新紀錄
 ├── nx.json                   # Nx workspace 設定
-├── package.json              # pnpm/Nx root package
+├── package.json              # pnpm/Nx root package（docker:* scripts）
 ├── pnpm-workspace.yaml
-├── .env.example
-├── .dockerignore
-└── .gitignore
+└── .env.example
 ```
 
 ---

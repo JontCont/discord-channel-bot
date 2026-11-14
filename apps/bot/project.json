@@ -1,33 +1,68 @@
 {
-  "name": "bot",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "root": "apps/bot",
-  "sourceRoot": "apps/bot",
-  "projectType": "application",
-  "targets": {
-    "serve": {
-      "command": "uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py",
-      "cache": false,
-      "continuous": true
-    },
-    "test": {
-      "command": "uv run --with-requirements requirements.txt python -m unittest discover -s tests",
-      "options": {
-        "cwd": "apps/bot"
-      },
-      "cache": true,
-      "inputs": ["pythonTests"],
-      "outputs": []
-    },
-    "compile": {
-      "command": "python -m compileall -q apps/bot/bot.py apps/bot/config.py apps/bot/cogs",
-      "cache": true,
-      "inputs": ["pythonSources"],
-      "outputs": [
-        "{projectRoot}/__pycache__/**/*",
-        "{projectRoot}/cogs/**/__pycache__/**/*"
-      ]
-    }
-  },
-  "tags": ["scope:bot", "type:application"]
+    "name":  "bot",
+    "$schema":  "../../node_modules/nx/schemas/project-schema.json",
+    "root":  "apps/bot",
+    "sourceRoot":  "apps/bot",
+    "projectType":  "application",
+    "targets":  {
+                    "serve":  {
+                                  "command":  "uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py",
+                                  "cache":  false,
+                                  "continuous":  true
+                              },
+                    "test":  {
+                                 "command":  "uv run --with-requirements requirements.txt python -m unittest discover -s tests",
+                                 "options":  {
+                                                 "cwd":  "apps/bot"
+                                             },
+                                 "cache":  true,
+                                 "inputs":  [
+                                                "pythonTests"
+                                            ],
+                                 "outputs":  [
+
+                                             ]
+                             },
+                    "compile":  {
+                                    "command":  "python -m compileall -q apps/bot/bot.py apps/bot/config.py apps/bot/cogs",
+                                    "cache":  true,
+                                    "inputs":  [
+                                                   "pythonSources"
+                                               ],
+                                    "outputs":  [
+                                                    "{projectRoot}/__pycache__/**/*",
+                                                    "{projectRoot}/cogs/**/__pycache__/**/*"
+                                                ]
+                                },
+                    "docker-dev":  {
+                                       "command":  "docker compose --project-directory . -f docker/docker-compose.local.yml up -d --build",
+                                       "cache":  false
+                                   },
+                    "docker-dev-down":  {
+                                            "command":  "docker compose --project-directory . -f docker/docker-compose.local.yml down",
+                                            "cache":  false
+                                        },
+                    "docker-dev-logs":  {
+                                            "command":  "docker compose --project-directory . -f docker/docker-compose.local.yml logs -f",
+                                            "cache":  false,
+                                            "continuous":  true
+                                        },
+                    "docker-prod":  {
+                                        "command":  "docker compose --project-directory . -f docker/docker-compose.yml pull \u0026\u0026 docker compose --project-directory . -f docker/docker-compose.yml up -d",
+                                        "cache":  false
+                                    },
+                    "docker-prod-down":  {
+                                             "command":  "docker compose --project-directory . -f docker/docker-compose.yml down",
+                                             "cache":  false
+                                         },
+                    "docker-prod-logs":  {
+                                             "command":  "docker compose --project-directory . -f docker/docker-compose.yml logs -f",
+                                             "cache":  false,
+                                             "continuous":  true
+                                         }
+                },
+    "tags":  [
+                 "scope:bot",
+                 "type:application"
+             ]
 }

@@ -74,7 +74,7 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'nx.json'
               - 'tsconfig.base.json'
-              - '.dockerignore'
+              - 'apps/web/Dockerfile.dockerignore'
               - '.github/workflows/cicd.yml'
               - '.github/workflows/build-image.yml'
               - '.github/workflows/deploy-image.yml'
@@ -210,7 +210,7 @@ jobs:
           image_tags_raw = os.environ.get("IMAGE_TAGS", "")
           changes_text = os.environ["LATEST_CHANGES"].strip()
           if not changes_text:
-              raise ValueError("The latest changes.md entry is empty.")
+              raise ValueError("The latest CHANGELOG.md entry is empty.")
           author = os.environ.get("AUTHOR", "")
           repo = os.environ.get("REPO", "")
           ref = os.environ.get("REF", "")
@@ -241,6 +241,18 @@ jobs:
               color = 15548997  # Red
               title = "❌ CI/CD Pipeline 執行失敗"
               desc = "Pipeline 執行過程中發生錯誤，請點擊下方記錄查看詳細日誌以進行除錯。"
+
+          # Discord embed field 不支援標題語法（#），改為粗體 / 標記，保留 - 清單
+          formatted_lines = []
+          for line in changes_text.splitlines():
+              if line.startswith("### "):
+                  line = f"【{line[4:].strip()}】"
+              elif line.startswith("## "):
+                  line = f"**{line[3:].strip()}**"
+              if not line.strip() and (not formatted_lines or not formatted_lines[-1].strip()):
+                  continue
+              formatted_lines.append(line)
+          changes_text = "\n".join(formatted_lines).strip()
 
           if len(changes_text) > 1020:
               changes_text = changes_text[:1015] + "..."

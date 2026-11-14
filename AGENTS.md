@@ -1,8 +1,8 @@
 # Commit change records
 
-- Every non-merge commit must update the latest entry in `changes.md`, including documentation-only commits.
+- Every non-merge commit must update the latest entry in `CHANGELOG.md`, including documentation-only commits.
 - Use the repository `update-changes` skill before preparing a commit.
-- Keep entries newest first, using `## YYYY-MM-DD - NN - Summary` without a `Build` prefix.
+- Keep entries newest first, using `## YYYY-MM-DD - NN` without a `Build` prefix, followed by a description line right below the heading.
 - Use the user's local date. Number each day's records from `00`, incrementing for new entries and resetting to `00` on the next date. Preserve prior entries and numbering; rerunning CI does not create a record.
 - Group items under `### feature`, `### bug`, `### chore`, `### docs`, `### refactor`, or `### test`. Use only relevant categories, without duplicates or empty groups.
 - Each category must contain at least one non-empty `- ` item. Classify bug fixes only when the fixed behavior is verified.
