@@ -168,6 +168,14 @@ class CommitValidationTests(unittest.TestCase):
         head = self.commit({"CHANGELOG.md": self.initial})
         self.assertEqual(validate_commits(self.repo, legacy, head), 1)
 
+    def test_falls_back_to_latest_commit_when_base_sha_is_missing_after_force_push(self):
+        head = self.commit({
+            "CHANGELOG.md": "# Changes\n\n## 2026-11-11 - 00\nNew\n### feature\n- New change\n\n"
+            + self.initial.removeprefix("# Changes\n\n")
+        })
+        missing_base = "deadbeef" * 5
+        self.assertEqual(validate_commits(self.repo, missing_base, head), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

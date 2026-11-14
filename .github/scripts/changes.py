@@ -90,8 +90,19 @@ def git(repo: Path, *args: str) -> str:
     ).stdout
 
 
+def _commit_exists(repo: Path, rev: str) -> bool:
+    return (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{rev}^{{commit}}"],
+            cwd=repo,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+
+
 def validate_commits(repo: Path, base: str, head: str) -> int:
-    if not base or set(base) == {"0"}:
+    if not base or set(base) == {"0"} or not _commit_exists(repo, base):
         commits = git(repo, "rev-list", "--max-count=1", "--no-merges", head).splitlines()
     else:
         commits = git(repo, "rev-list", "--reverse", "--no-merges", f"{base}..{head}").splitlines()

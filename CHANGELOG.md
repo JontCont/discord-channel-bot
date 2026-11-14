@@ -6,6 +6,18 @@
 再依 `feature`、`bug`、`chore`、`docs`、
 `refactor`、`test` 分類。分類使用 `### 分類`，只保留有內容的分類。
 
+## 2026-11-14 - 04
+
+修正 Force Push 後變更紀錄驗證因舊 Base SHA 不存在而失敗的問題
+
+### bug
+
+- 修正 `.github/scripts/changes.py` 在分支進行 `git push --force`（如 rebase / squash 歷史）後，因 `github.event.before` 指向已被取代的舊 commit SHA 導致 `git rev-list` 報錯 `Invalid revision range` 的問題；當 `base` commit 不存在於儲存庫時，自動退回驗證 `HEAD` 最新一筆非 merge commit。
+
+### test
+
+- 新增 `.github/scripts/test_changes.py` 針對 `base` SHA 不存在時的退回驗證測試。
+
 ## 2026-11-14 - 03
 
 修復 GitHub Actions 語法檢查路徑與優化驗證邏輯認知複雜度
