@@ -96,10 +96,10 @@ uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py
 pnpm nx run web:dev
 ```
 
-只想調整 Web 畫面、不想登入或啟動 Bot 時，可用 Mock 模式（資料存在記憶體，重新整理即重置）：
+只想調整 Web 畫面、不想登入或啟動 Bot 時，可用 Mock 模式（資料存在記憶體，重新整理即重置；首頁 `/` 為功能介紹頁，點擊右上角或主視覺按鈕即可進入 Mock 設定後台）：
 
 ```powershell
-pnpm run web:mock   # http://localhost:5173 ，自動進入 Mock 伺服器的編輯畫面
+pnpm run web:mock   # http://localhost:5173 ，開啟功能介紹首頁與 Mock 伺服器設定後台
 ```
 
 本機開發時，將 `DISCORD_REDIRECT_URI` 設為 `http://localhost:5173/api/auth/callback`；若連到共用 Discord 伺服器，建議設定 `DYNAMIC_VOICE_CREATE_ENABLED=false` 及 `DYNAMIC_VOICE_DELETE_ENABLED=false`，避免誤建或誤刪動態語音房。
@@ -158,7 +158,9 @@ discord-channel-bot/
 │   │   ├── tests/            # Bot/API 單元測試
 │   │   ├── requirements.txt  # Python dependencies
 │   │   └── Dockerfile
-│   └── web/                  # React/Vite 設定後台（支援模組化管理與 Mock 模式）
+│   └── web/                  # React/Vite 功能介紹首頁與設定後台（支援模組化管理與 Mock 模式）
+├── docs/
+│   └── web-homepage.md       # Web 首頁架構、CSS 動畫與多語系導覽文件
 ├── docker/
 │   ├── docker-compose.yml        # Image 部署用 Compose 設定
 │   ├── docker-compose.local.yml  # 本機從 source code 建置

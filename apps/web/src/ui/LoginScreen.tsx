@@ -21,6 +21,8 @@ export function LoginScreen() {
         </a>
         <p className="privacy-note"><ShieldCheck aria-hidden="true" /> {t('login.secure')}</p>
         <nav className="login-legal" aria-label={t('login.legalLabel')}>
+          <Link to="/">{t('home.footer.home')}</Link>
+          <span aria-hidden="true">·</span>
           <Link to="/privacy">{t('login.privacy')}</Link>
           <span aria-hidden="true">·</span>
           <Link to="/terms">{t('login.terms')}</Link>

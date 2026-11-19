@@ -1,5 +1,4 @@
 import {
-  Navigate,
   Outlet,
   createRootRoute,
   createRoute,
@@ -7,11 +6,11 @@ import {
 } from '@tanstack/react-router'
 import { AuthenticatedLayout } from './ui/AuthenticatedLayout'
 import { GuildPicker } from './ui/GuildPicker'
+import { HomePage } from './ui/HomePage'
 import { PrivacyPolicyPage, TermsOfServicePage } from './ui/LegalPages'
 import { LoginScreen } from './ui/LoginScreen'
 import { SettingsPage } from './ui/SettingsPage'
 import { NotFound } from './ui/States'
-import { MOCK_GUILD_ID } from './mock-constants'
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -21,12 +20,7 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: () =>
-    import.meta.env.VITE_MOCK === 'true' ? (
-      <Navigate to="/guilds/$guildId/settings" params={{ guildId: MOCK_GUILD_ID }} replace />
-    ) : (
-      <Navigate to="/guilds" replace />
-    ),
+  component: HomePage,
 })
 
 const loginRoute = createRoute({

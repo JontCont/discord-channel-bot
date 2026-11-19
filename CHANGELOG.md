@@ -6,6 +6,20 @@
 再依 `feature`、`bug`、`chore`、`docs`、
 `refactor`、`test` 分類。分類使用 `### 分類`，只保留有內容的分類。
 
+## 2026-11-19 - 01
+
+新增現代化產品功能介紹首頁、CSS 動態視覺動畫與首頁架構文件
+
+### feature
+
+- 新增 Web 產品功能介紹首頁（`apps/web/src/ui/HomePage.tsx`），將 `/` 路由設為首頁入口，包含置頂毛玻璃導覽列、Hero 主視覺、擬真 Discord 互動面板預覽視窗、六大模組 Bento 卡片牆、三步驟導入流程與互動式 Slash 指令瀏覽器。
+- 在 `apps/web/src/styles.css` 新增多組硬體加速 CSS Keyframe 動畫（背景光暈球漂浮、預覽視窗與提示卡錯位懸浮、漸層標題流動、狀態脈衝波紋、語音聲波跳動與卡片依序進場），並支援 `prefers-reduced-motion` 無障礙減敏設定。
+- 在 `apps/web/src/i18n.ts` 完整擴充繁體中文（`zh-Hant`）、英文（`en`）與日文（`ja`）三語系首頁介紹文案，並串接各頁面品牌標誌返回首頁。
+
+### docs
+
+- 新增 `docs/web-homepage.md` 首頁架構、CSS 動畫與多語系導覽文件，並同步更新 `README.md` 與 `README.en.md` 的專案結構與 Mock 模式說明。
+
 ## 2026-11-19 - 00
 
 精簡中英文 README，移除內部部署環境細節並更新專案分層架構說明

@@ -41,7 +41,7 @@ export function AuthenticatedLayout() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Link className="brand" to="/guilds" aria-label={t('common.productHome')}>
+        <Link className="brand" to="/" aria-label={t('common.productHome')}>
           <span className="brand-mark small"><Bot aria-hidden="true" /></span>
           <span>Channel Bot</span>
         </Link>

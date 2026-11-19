@@ -93,10 +93,10 @@ uv run --with-requirements apps/bot/requirements.txt python apps/bot/bot.py
 pnpm nx run web:dev
 ```
 
-To tweak the web UI without logging in or running the bot, use mock mode (data lives in memory and resets on reload):
+To tweak the web UI without logging in or running the bot, use mock mode (data lives in memory and resets on reload; `/` opens the feature landing page with a direct button into the mock settings console):
 
 ```powershell
-pnpm run web:mock   # http://localhost:5173, opens the mock server's settings page directly
+pnpm run web:mock   # http://localhost:5173, opens the feature home page and mock server settings
 ```
 
 For local development set `DISCORD_REDIRECT_URI` to `http://localhost:5173/api/auth/callback`. If your local bot connects to a shared Discord server, set `DYNAMIC_VOICE_CREATE_ENABLED=false` and `DYNAMIC_VOICE_DELETE_ENABLED=false` to avoid creating or deleting dynamic voice rooms.
@@ -155,7 +155,9 @@ discord-channel-bot/
 │   │   ├── tests/            # Bot/API unit tests
 │   │   ├── requirements.txt  # Python dependencies
 │   │   └── Dockerfile
-│   └── web/                  # React/Vite settings dashboard (modular UI & mock mode)
+│   └── web/                  # React/Vite feature home page & settings dashboard (modular UI & mock mode)
+├── docs/
+│   └── web-homepage.md       # Web homepage architecture, CSS animations & i18n documentation
 ├── docker/
 │   ├── docker-compose.yml        # Compose file for image deployment
 │   ├── docker-compose.local.yml  # local build from source

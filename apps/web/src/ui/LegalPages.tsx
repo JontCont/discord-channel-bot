@@ -9,7 +9,7 @@ function LegalPage({ title, children }: { title: string; children: ReactNode }) 
   return (
     <div className="legal-shell">
       <header className="legal-topbar">
-        <Link className="brand" to="/login" aria-label={t('common.productHome')}>
+        <Link className="brand" to="/" aria-label={t('common.productHome')}>
           <span className="brand-mark small"><Bot aria-hidden="true" /></span>
           <span>Channel Bot</span>
         </Link>
