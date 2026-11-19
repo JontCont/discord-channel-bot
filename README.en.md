@@ -99,19 +99,7 @@ To tweak the web UI without logging in or running the bot, use mock mode (data l
 pnpm run web:mock   # http://localhost:5173, opens the mock server's settings page directly
 ```
 
-For local development set `DISCORD_REDIRECT_URI` to
-`http://localhost:5173/api/auth/callback`. Production must use HTTPS and set
-`SESSION_COOKIE_SECURE=true`.
-
-If your local bot connects to a shared Discord server, set
-`DYNAMIC_VOICE_CREATE_ENABLED=false` and `DYNAMIC_VOICE_DELETE_ENABLED=false`
-to avoid creating or deleting dynamic voice rooms. The two switches are independent
-and cover public auto rooms, private rooms and party rooms; the delete switch also
-covers empty-room events, the per-minute cleanup and cleanup of missing-registry private
-rooms. When creation is disabled the party form shows a notice. Both default to `true`;
-restart the bot after changing them, and the web dashboard cannot override them.
-This is not a full read-only mode: creating hub channels for setup, managing existing
-rooms and other bot features are unaffected.
+For local development set `DISCORD_REDIRECT_URI` to `http://localhost:5173/api/auth/callback`. If your local bot connects to a shared Discord server, set `DYNAMIC_VOICE_CREATE_ENABLED=false` and `DYNAMIC_VOICE_DELETE_ENABLED=false` to avoid creating or deleting dynamic voice rooms.
 
 ```powershell
 # Verify
@@ -121,111 +109,27 @@ pnpm nx run web:typecheck
 pnpm nx run web:build
 ```
 
-### Run on a NAS with Docker
-
-The NAS only needs [`docker/docker-compose.yml`](docker/docker-compose.yml) (copy it into a folder on the NAS) and `.env`; no source code is required. Create the
-`data` and `logs` directories, then pull the GHCR images and start:
-
-```bash
-mkdir -p data logs
-docker compose pull
-docker compose up -d
-docker compose logs -f
-```
-
-If the GHCR package is private, log in first:
-
-```bash
-echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
-```
-
-To update, run `docker compose pull` and `docker compose up -d` again. The `latest`
-tag is used by default; pin a version with `BOT_IMAGE` / `WEB_IMAGE` in `.env`.
-
-In the GitHub repository go to **Settings → Secrets and variables → Actions → New repository secret**
-and add `DEPLOY_WEBHOOK_URL`, whose value is the base URL of the production deploy webhook (without `/:project`).
-The URL is not stored in source code; without this secret the deploy step fails explicitly.
-
-The pipeline chooses build targets from the changed files:
-
-- `apps/web/**` or shared Web build config (`package.json`, pnpm lockfile/workspace,
-  `nx.json`, `tsconfig.base.json`, `apps/web/Dockerfile.dockerignore`): build Web only, skip Bot CI.
-- `apps/bot/**`: run Bot CI and build Bot only.
-- Both changed, or `.github/workflows/cicd.yml` / `build-image.yml` /
-  `deploy-image.yml` changed: build both images.
-- Docs-only changes that touch none of the above: skip Bot CI, image builds and deploys, but still check the changelog.
-- Manual runs and version tags: keep the full build of both images.
-
-The Actions graph shows two explicit branches:
-
-- **API**: change detection → API Build → API Deploy.
-- **Web**: change detection → Web Build → Web Deploy.
-- API Build includes Python CI and uses the existing Bot/API image; Web does not wait for API.
-- Both branches meet at the Discord notification; unaffected branches show as skipped.
-
-[`cicd.yml`](.github/workflows/cicd.yml) handles routing, while
-[`build-image.yml`](.github/workflows/build-image.yml) and
-[`deploy-image.yml`](.github/workflows/deploy-image.yml) hold the shared build and deploy logic.
-The four Build/Deploy jobs are wired explicitly in the main workflow; they are not two independent push pipelines.
-`DEPLOY_WEBHOOK_URL` is declared in the `env` at the top of the deploy workflow and
-still only needs the one Repository Secret.
-
-After the `latest` image on the default branch is pushed to GHCR, CI POSTs to
-`${DEPLOY_WEBHOOK_URL}/:project` (a trailing `/` on the base URL is handled):
-
-| Project | Image | Tag |
-|---|---|---|
-| `discord-channel-bot` | `ghcr.io/jontcont/discord-channel-bot-bot` | `latest` |
-| `discord-channel-bot-web` | `ghcr.io/jontcont/discord-channel-bot-web` | `latest` |
-
-Pull Requests and version-tag builds do not trigger the deploy webhook; manually running the workflow on the default branch does.
-If the webhook connection fails, times out or returns an HTTP error, the corresponding build job fails.
-Once the webhook fires, the step is done; failures during NAS deploy or restart are reported to Discord directly by n8n.
-The existing Discord webhook notification is unchanged.
-
-### Per-commit change records
-
-Every new non-merge commit (including docs-only ones) must update the latest entry at the top of
-[`CHANGELOG.md`](CHANGELOG.md). Use `## YYYY-MM-DD - NN` (no `Build` prefix)
-as the heading, put the description on the line right below it, then group with `### feature`, `### bug`, `### chore`, `### docs`,
-`### refactor`, `### test`. Keep only categories that have content, give each at least one non-empty
-`- ` item, and do not repeat a category; older entries stay below.
-Numbering goes `00`, `01`, … within a day and resets to `00` the next day, newest on top.
-Dates use the author's local date; numbers follow the change records, not `github.run_number`, and re-running CI
-adds no number. CI checks date order, duplicate numbers and gaps.
-The early 1.x release notes were converted to the same format and live at the bottom of [`CHANGELOG.md`](CHANGELOG.md).
-
-CI checks each non-merge commit in the push / Pull Request range one by one; a commit that does not update the file,
-deletes it or only edits old entries blocks the build. A first push of a new branch (no previous SHA) checks only the
-latest non-merge commit; manual runs and version tags only validate the latest entry format.
-The Discord notification reads the latest entry at the top directly instead of composing it from commit messages. Because Discord embeds do not render
-Markdown headings, `##` is sent as bold and `###` as 【category】.
-
-You can ask Copilot to use the repository's
-[`update-changes` skill](.github/skills/update-changes/SKILL.md) to write entries;
-the rules are also in [`AGENTS.md`](AGENTS.md). CI never calls Copilot or any other AI service.
-If an existing commit forgot its entry, adding a separate follow-up commit still fails; first confirm whether rewriting
-that commit's history is allowed — the skill never amends, rebases or force-pushes on its own.
-
-```powershell
-python .github/scripts/changes.py latest
-python -m unittest discover -s .github/scripts -p test_changes.py
-python .github/scripts/changes.py check --base BASE_SHA --head HEAD_SHA
-```
-
 ### Docker commands (pnpm / Nx)
 
-The Compose files live in [`docker/`](docker/). These commands run relative to the repository root (`.env`, `data` and `logs` are in the root).
-The same commands are available in Nx Console under the `bot` project as the `docker-dev`, `docker-prod`, etc. targets:
+The Compose files live in [`docker/`](docker/). These commands run relative to the repository root:
 
 ```powershell
 pnpm run docker:dev        # build from source and start locally (docker/docker-compose.local.yml)
 pnpm run docker:dev:down   # stop and remove
 pnpm run docker:dev:logs   # follow logs
 
-pnpm run docker:prod       # pull GHCR images and start (docker/docker-compose.yml)
+pnpm run docker:prod       # start using docker/docker-compose.yml
 pnpm run docker:prod:down
 pnpm run docker:prod:logs
+```
+
+### Changelog records
+
+Every non-merge commit must update the latest entry at the top of [`CHANGELOG.md`](CHANGELOG.md) (heading format `## YYYY-MM-DD - NN` with a summary line below it, grouped by `### feature`, `### bug`, `### chore`, `### docs`, `### refactor`, or `### test`). See [`AGENTS.md`](AGENTS.md) for full rules.
+
+```powershell
+python .github/scripts/changes.py latest
+python -m unittest discover -s .github/scripts -p test_changes.py
 ```
 
 ---
@@ -235,29 +139,33 @@ pnpm run docker:prod:logs
 ```
 discord-channel-bot/
 ├── .github/
-│   ├── workflows/            # CI/CD (cicd.yml, build-image.yml, deploy-image.yml)
+│   ├── workflows/            # CI/CD workflows
 │   ├── scripts/              # changelog validation (changes.py) and tests
-│   └── skills/update-changes # skill for updating CHANGELOG.md
+│   └── skills/               # contributor helper skills
 ├── apps/
-│   ├── bot/
-│   │   ├── bot.py            # Bot and API entry point
-│   │   ├── config.py         # Python environment settings
-│   │   ├── cogs/             # Discord, API, data and service modules
+│   ├── bot/                  # Discord Bot and FastAPI backend (Clean Layered Architecture)
+│   │   ├── bot.py            # Composition Root and entry point
+│   │   ├── config.py         # environment variables and locale defaults
+│   │   ├── api/              # FastAPI OAuth and Settings API routes
+│   │   ├── cogs/             # Discord presentation layer (prefix/ and slash/ commands)
+│   │   ├── core/             # DI container, constants, enums, logging and error handler
+│   │   ├── models/           # domain data models (e.g. GuildSettings)
+│   │   ├── repository/       # SQLite data access layer (DAL)
+│   │   ├── service/          # business logic services
 │   │   ├── tests/            # Bot/API unit tests
 │   │   ├── requirements.txt  # Python dependencies
-│   │   ├── Dockerfile
-│   │   └── project.json      # Nx bot project (incl. docker-* targets)
-│   └── web/                  # React/Vite settings dashboard (incl. Dockerfile, Dockerfile.dockerignore)
+│   │   └── Dockerfile
+│   └── web/                  # React/Vite settings dashboard (modular UI & mock mode)
 ├── docker/
-│   ├── docker-compose.yml        # production: uses GHCR images
-│   ├── docker-compose.local.yml  # local: build from source
-│   └── docker-compose.base.yml   # same base config as local
+│   ├── docker-compose.yml        # Compose file for image deployment
+│   ├── docker-compose.local.yml  # local build from source
+│   └── docker-compose.base.yml   # shared base config
 ├── data/                     # data directory (SQLite databases)
 ├── logs/                     # bot runtime logs
 ├── AGENTS.md                 # contributor and changelog rules
 ├── CHANGELOG.md              # per-commit change records
 ├── nx.json                   # Nx workspace config
-├── package.json              # pnpm/Nx root package (docker:* scripts)
+├── package.json              # pnpm/Nx root package
 ├── pnpm-workspace.yaml
 └── .env.example
 ```
@@ -266,50 +174,28 @@ discord-channel-bot/
 
 ## ⚙️ Environment variables
 
-Set these in your `.env` file:
+Copy [`.env.example`](.env.example) to `.env` and adjust as needed (never commit real tokens or secrets to version control):
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DISCORD_TOKEN` | ✅ | — | Your Discord bot token |
+| `DISCORD_TOKEN` | ✅ | — | Discord bot token |
 | `DISCORD_CLIENT_ID` | Web | — | Discord OAuth client ID |
 | `DISCORD_CLIENT_SECRET` | Web | — | Discord OAuth client secret |
 | `DISCORD_REDIRECT_URI` | Web | — | Discord OAuth callback URL |
 | `WEB_BASE_URL` | — | `/` | Web URL to return to after OAuth |
-| `SESSION_COOKIE_SECURE` | — | `false` | Set to `true` for HTTPS production |
-| `SETTINGS_DB_PATH` | — | `data/settings.db` | Per-guild dynamic settings database |
+| `SESSION_COOKIE_SECURE` | — | `false` | Set to `true` for HTTPS environments |
+| `SETTINGS_DB_PATH` | — | `data/settings.db` | Per-guild dynamic settings SQLite path |
 | `API_HOST` | — | `0.0.0.0` | Settings API listen host |
 | `API_PORT` | — | `8000` | Settings API listen port |
-| `BOT_IMAGE` | — | `ghcr.io/jontcont/discord-channel-bot-bot:latest` | Bot image used on the NAS |
-| `WEB_IMAGE` | — | `ghcr.io/jontcont/discord-channel-bot-web:latest` | Web image used on the NAS |
 | `BOT_PREFIX` | — | `!` | Prefix command symbol |
-| `LOG_LEVEL` | — | `INFO` | Log level (DEBUG / INFO / WARNING / ERROR) |
-| `BOT_LANGUAGE` | — | `zh-TW` | Default locale (e.g. `zh-TW` / `en-US`). Applies the matching defaults when names are not customized |
-| `GUILD_ID` | — | — | Development guild ID; when set, slash commands sync to that guild instantly |
-| `INTRODUCTION_CATEGORY` | — | locale-based | Self-introduction category name (zh-TW default "一般") |
-| `INTRODUCTION_CHANNEL` | — | locale-based | Self-introduction text channel name (zh-TW default "📝｜自我介紹") |
-| `AUTO_VOICE_TRIGGER` | — | locale-based | Public voice room trigger channel name |
-| `DYNAMIC_VOICE_CREATE_ENABLED` | — | `true` | Allow creating dynamic voice rooms; accepts only `true` / `false` |
-| `DYNAMIC_VOICE_DELETE_ENABLED` | — | `true` | Allow deleting dynamic voice rooms; accepts only `true` / `false` |
-| `AUTO_VOICE_SUFFIX` | — | locale-based | Suffix for auto-created voice channels |
-| `AUTO_VOICE_LIMIT` | — | `6` | Default member limit for public voice rooms |
-| `PRIVATE_CATEGORY` | — | locale-based | Private room category name |
-| `PRIVATE_TRIGGER` | — | locale-based | Private room trigger channel name |
-| `PRIVATE_SUFFIX` | — | locale-based | Private room channel suffix |
-| `PRIVATE_LIMIT` | — | `4` | Default member limit for private rooms |
-| `PASSWORD_CHANNEL` | — | locale-based | Password entry channel name |
-| `SKILL_PREFIX` | — | locale-based | Skill category prefix |
-| `SKILL_PANEL_CHANNEL` | — | locale-based | Shared Skill / room-creation hub name, zh-TW default "🎯｜社群入口" |
-| `PARTY_NOTIFICATION_CHANNEL` | — | locale-based | Share-notification channel in the hub's category, zh-TW default "📣｜揪團通知" |
-| `SKILL_PANEL_DIRECT_JOIN_SKILLS` | — | `鍛造術,遊戲術,墨繪術` | Skills that can be joined by button when `/skill panel` has no `direct_join_skills` |
-| `LEVELING_DB_PATH` | — | `data/leveling.db` | Leveling database file path |
-| `XP_PER_MESSAGE_MIN` | — | `15` | Minimum XP per message |
-| `XP_PER_MESSAGE_MAX` | — | `25` | Maximum XP per message |
-| `XP_MESSAGE_COOLDOWN` | — | `60` | Message XP cooldown (seconds) |
-| `XP_PER_VOICE_TICK` | — | `10` | XP per voice tick |
-| `XP_VOICE_INTERVAL` | — | `300` | Voice XP interval (seconds) |
-| `XP_DAILY_BASE` | — | `50` | Base XP for the daily check-in |
-| `LEVELUP_CHANNEL` | — | locale-based | Level-up announcement channel name |
-| `LEVEL_ROLES` | — | (built-in 10 tiers, locale-based) | Level milestone roles, format: `[lv,"name","#HEX"],...` |
+| `LOG_LEVEL` | — | `INFO` | Log level (`DEBUG` / `INFO` / `WARNING` / `ERROR`) |
+| `BOT_LANGUAGE` | — | `zh-TW` | Default locale (`zh-TW` / `en-US`) |
+| `GUILD_ID` | — | — | Development guild ID (instant slash command sync when set) |
+| `DYNAMIC_VOICE_CREATE_ENABLED` | — | `true` | Allow creating dynamic voice rooms (`true` / `false`) |
+| `DYNAMIC_VOICE_DELETE_ENABLED` | — | `true` | Allow deleting dynamic voice rooms (`true` / `false`) |
+| `LEVELING_DB_PATH` | — | `data/leveling.db` | Leveling SQLite database path |
+
+> Other channel names, member limits, and XP parameters have locale-based defaults and can be customized dynamically in the web dashboard; see [`.env.example`](.env.example) for the complete list.
 
 ---
 

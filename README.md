@@ -102,16 +102,7 @@ pnpm nx run web:dev
 pnpm run web:mock   # http://localhost:5173 ，自動進入 Mock 伺服器的編輯畫面
 ```
 
-本機開發時，將 `DISCORD_REDIRECT_URI` 設為
-`http://localhost:5173/api/auth/callback`。正式環境必須使用 HTTPS，並設定
-`SESSION_COOKIE_SECURE=true`。
-
-本機若連到共用 Discord 伺服器，請將 `DYNAMIC_VOICE_CREATE_ENABLED=false`
-及 `DYNAMIC_VOICE_DELETE_ENABLED=false`，避免建立或刪除動態語音房。
-兩個開關獨立控制公開自動房、私人包廂及揪團房；刪除開關也涵蓋空房事件、
-每分鐘清理及遺失登記的私人空房清理。停用建立時，揪團表單會顯示停用提示。
-未設定時兩者預設為 `true`；修改後需重啟 Bot，且 Web 後台不能覆寫這些開關。
-這不是完整唯讀模式：設定用入口頻道的建立、既有房間管理及其他 Bot 功能不受影響。
+本機開發時，將 `DISCORD_REDIRECT_URI` 設為 `http://localhost:5173/api/auth/callback`；若連到共用 Discord 伺服器，建議設定 `DYNAMIC_VOICE_CREATE_ENABLED=false` 及 `DYNAMIC_VOICE_DELETE_ENABLED=false`，避免誤建或誤刪動態語音房。
 
 ```powershell
 # 驗證
@@ -121,111 +112,27 @@ pnpm nx run web:typecheck
 pnpm nx run web:build
 ```
 
-### NAS Docker 啟動
-
-NAS 只需要 [`docker/docker-compose.yml`](docker/docker-compose.yml)（複製到 NAS 同一個資料夾）與 `.env`，不需要上傳 source code。先建立
-`data`、`logs` 目錄，再拉取 GHCR images 並啟動：
-
-```bash
-mkdir -p data logs
-docker compose pull
-docker compose up -d
-docker compose logs -f
-```
-
-若 GHCR package 設為 private，請先登入：
-
-```bash
-echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
-```
-
-更新版本時再次執行 `docker compose pull` 與 `docker compose up -d`。預設使用
-`latest`，也可在 `.env` 以 `BOT_IMAGE`、`WEB_IMAGE` 指定固定版本。
-
-在 GitHub 儲存庫的 **Settings → Secrets and variables → Actions → New repository secret**
-新增 `DEPLOY_WEBHOOK_URL`，值為正式部署 webhook 的基底網址（不含 `/:project`）。
-網址不存入原始碼；未設定此 Secret 時，部署步驟會明確失敗。
-
-Pipeline 依變更檔案選擇建置目標：
-
-- `apps/web/**` 或 Web 共用建置設定（`package.json`、pnpm lockfile/workspace、
-  `nx.json`、`tsconfig.base.json`、`apps/web/Dockerfile.dockerignore`）：只建置 Web，不執行 Bot CI。
-- `apps/bot/**`：只執行 Bot CI 並建置 Bot。
-- 兩邊都有變更或修改 `.github/workflows/cicd.yml`／`build-image.yml`／
-  `deploy-image.yml`：建置兩個 image。
-- 純文件等不影響上述路徑的變更：略過 Bot CI、image 建置與部署，仍檢查更新紀錄。
-- 手動執行與版本標籤：保留完整建置兩個 image 的行為。
-
-Actions 圖表會明確顯示兩條分支：
-
-- **API**：變更偵測 → API Build → API Deploy。
-- **Web**：變更偵測 → Web Build → Web Deploy。
-- API Build 內含 Python CI，使用既有的 Bot/API image；Web 不等待 API。
-- 最後匯合 Discord 通知；未受影響的分支會標示 skipped。
-
-[`cicd.yml`](.github/workflows/cicd.yml) 負責分流，
-[`build-image.yml`](.github/workflows/build-image.yml) 與
-[`deploy-image.yml`](.github/workflows/deploy-image.yml) 分別維護共用建置與部署邏輯。
-四個 Build／Deploy job 在主 workflow 明確連線，不是兩個獨立的 push pipeline。
-`DEPLOY_WEBHOOK_URL` 在部署 workflow 最上方的 `env` 宣告，
-仍只需設定同一個 Repository Secret。
-
-CI/CD 在預設分支的 `latest` image 成功推送至 GHCR 後，會分別 POST 至
-`${DEPLOY_WEBHOOK_URL}/:project`（自動處理基底網址末尾的 `/`）：
-
-| Project | Image | Tag |
-|---|---|---|
-| `discord-channel-bot` | `ghcr.io/jontcont/discord-channel-bot-bot` | `latest` |
-| `discord-channel-bot-web` | `ghcr.io/jontcont/discord-channel-bot-web` | `latest` |
-
-Pull Request 與版本標籤建置不會觸發部署 webhook；手動執行預設分支的 workflow
-則會觸發。Webhook 連線失敗、逾時或回傳 HTTP 錯誤時，對應的建置 job 會失敗。
-Webhook 觸發後即完成該步驟，NAS 部署或重啟過程的異常由 n8n 直接發送 Discord 警報通知。
-原有的 Discord webhook 通知保持不變。
-
-### 每次提交的更新紀錄
-
-每個新進的非 merge commit（包含純文件修改）都必須更新
-[`CHANGELOG.md`](CHANGELOG.md) 最上方的最新紀錄。使用 `## YYYY-MM-DD - NN`（不加 `Build`）
-作為標題，標題下一行寫 description（摘要說明），再用 `### feature`、`### bug`、`### chore`、`### docs`、
-`### refactor`、`### test` 分組。只保留有內容的分類，每個分類至少一個非空的
-`- ` 項目，不能重複分類；舊紀錄保留在下方。
-同一天從 `00`、`01` 依序編號，隔天重設為 `00`，最新放在最上方。
-日期依使用者本地日期填寫；編號跟隨更新紀錄，不是 `github.run_number`，重跑 CI
-不會新增編號。CI 會檢查日期排序、編號重複及缺號。
-早期的 1.x 版本紀錄已轉為相同格式，收在 [`CHANGELOG.md`](CHANGELOG.md) 最下方。
-
-CI 會逐一檢查 push／Pull Request 範圍內的非 merge commit；沒有更新檔案、
-刪除檔案或只修改舊紀錄都會阻擋建置。新分支首次 push（沒有前一個 SHA）只檢查
-最新的非 merge commit；手動執行與版本標籤只驗證最新紀錄格式。
-Discord 通知直接讀取最上方的最新紀錄，不再從 commit 訊息組合更新內容。因 Discord embed 不顯示
-Markdown 標題，送出時會將 `##` 轉為粗體、`###` 轉為【分類】。
-
-可請 Copilot 使用專案內的
-[`update-changes` Skill](.github/skills/update-changes/SKILL.md) 協助補寫；
-規範也記錄在 [`AGENTS.md`](AGENTS.md)。這不需要 CI 呼叫 Copilot 或其他 AI 服務。
-若既有 commit 漏寫，單純追加一個紀錄 commit 仍不會通過；需要先確認是否允許修改
-該 commit 的歷史，Skill 不會自行 amend、rebase 或 force-push。
-
-```powershell
-python .github/scripts/changes.py latest
-python -m unittest discover -s .github/scripts -p test_changes.py
-python .github/scripts/changes.py check --base BASE_SHA --head HEAD_SHA
-```
-
 ### Docker 指令（pnpm / Nx）
 
-Compose 檔放在 [`docker/`](docker/)，以下指令會以專案根目錄為基準執行（`.env`、`data`、`logs` 皆在根目錄）。
-同樣的指令也在 Nx Console 的 `bot` 專案下以 `docker-dev`、`docker-prod` 等 targets 提供：
+Compose 檔位於 [`docker/`](docker/)，以下指令以專案根目錄為基準執行：
 
 ```powershell
 pnpm run docker:dev        # 本機從 source code 建置並啟動（docker/docker-compose.local.yml）
 pnpm run docker:dev:down   # 停止並移除
 pnpm run docker:dev:logs   # 追蹤日誌
 
-pnpm run docker:prod       # 拉取 GHCR images 並啟動（docker/docker-compose.yml）
+pnpm run docker:prod       # 使用 docker/docker-compose.yml 啟動
 pnpm run docker:prod:down
 pnpm run docker:prod:logs
+```
+
+### 變更紀錄（CHANGELOG）
+
+每個非 merge commit 都應更新 [`CHANGELOG.md`](CHANGELOG.md) 最上方的最新紀錄（標題格式 `## YYYY-MM-DD - NN`，下一行寫摘要，並依 `### feature`、`### bug`、`### chore`、`### docs`、`### refactor`、`### test` 分類）。詳細規範請參考 [`AGENTS.md`](AGENTS.md)。
+
+```powershell
+python .github/scripts/changes.py latest
+python -m unittest discover -s .github/scripts -p test_changes.py
 ```
 
 ---
@@ -235,29 +142,33 @@ pnpm run docker:prod:logs
 ```
 discord-channel-bot/
 ├── .github/
-│   ├── workflows/            # CI/CD（cicd.yml、build-image.yml、deploy-image.yml）
-│   ├── scripts/              # 更新紀錄驗證（changes.py）與測試
-│   └── skills/update-changes # 更新 CHANGELOG.md 的 Skill
+│   ├── workflows/            # CI/CD workflows
+│   ├── scripts/              # 變更紀錄驗證（changes.py）與測試
+│   └── skills/               # 專案開發輔助 Skills
 ├── apps/
-│   ├── bot/
-│   │   ├── bot.py            # Bot 與 API 主程式入口
-│   │   ├── config.py         # Python 環境變數設定
-│   │   ├── cogs/             # Discord、API、資料與服務模組
+│   ├── bot/                  # Discord Bot 與 FastAPI 後端（Clean Layered Architecture）
+│   │   ├── bot.py            # Composition Root 與程式入口
+│   │   ├── config.py         # 環境變數與多語系預設設定
+│   │   ├── api/              # FastAPI OAuth 與 Settings API 路由
+│   │   ├── cogs/             # Discord 表現層（prefix/ 與 slash/ 指令）
+│   │   ├── core/             # DI 容器（container）、常數、列舉、日誌與錯誤處理
+│   │   ├── models/           # 領域資料模型（如 GuildSettings）
+│   │   ├── repository/       # SQLite 資料存取層（DAL）
+│   │   ├── service/          # 業務邏輯服務層
 │   │   ├── tests/            # Bot/API 單元測試
 │   │   ├── requirements.txt  # Python dependencies
-│   │   ├── Dockerfile
-│   │   └── project.json      # Nx bot project（含 docker-* targets）
-│   └── web/                  # React/Vite 設定後台（含 Dockerfile、Dockerfile.dockerignore）
+│   │   └── Dockerfile
+│   └── web/                  # React/Vite 設定後台（支援模組化管理與 Mock 模式）
 ├── docker/
-│   ├── docker-compose.yml        # 正式環境：使用 GHCR images
-│   ├── docker-compose.local.yml  # 本機：從 source code 建置
-│   └── docker-compose.base.yml   # 與 local 相同的基礎設定
+│   ├── docker-compose.yml        # Image 部署用 Compose 設定
+│   ├── docker-compose.local.yml  # 本機從 source code 建置
+│   └── docker-compose.base.yml   # 共用基礎設定
 ├── data/                     # 資料目錄（SQLite 資料庫）
 ├── logs/                     # Bot runtime logs
 ├── AGENTS.md                 # 協作與更新紀錄規範
-├── CHANGELOG.md              # 每次提交的更新紀錄
+├── CHANGELOG.md              # 變更紀錄
 ├── nx.json                   # Nx workspace 設定
-├── package.json              # pnpm/Nx root package（docker:* scripts）
+├── package.json              # pnpm/Nx root package
 ├── pnpm-workspace.yaml
 └── .env.example
 ```
@@ -266,50 +177,28 @@ discord-channel-bot/
 
 ## ⚙️ 環境變數
 
-在 `.env` 檔案中設定以下環境變數：
+複製 [`.env.example`](.env.example) 為 `.env` 後依需求調整（切勿將真實 Token 或 Secret 提交至版本控制）：
 
 | 變數名稱 | 必填 | 預設值 | 說明 |
 |---|---|---|---|
-| `DISCORD_TOKEN` | ✅ | — | 你的 Discord Bot Token |
-| `DISCORD_CLIENT_ID` | Web 必填 | — | Discord OAuth client ID |
-| `DISCORD_CLIENT_SECRET` | Web 必填 | — | Discord OAuth client secret |
-| `DISCORD_REDIRECT_URI` | Web 必填 | — | Discord OAuth callback URL |
+| `DISCORD_TOKEN` | ✅ | — | Discord Bot Token |
+| `DISCORD_CLIENT_ID` | Web 必填 | — | Discord OAuth Client ID |
+| `DISCORD_CLIENT_SECRET` | Web 必填 | — | Discord OAuth Client Secret |
+| `DISCORD_REDIRECT_URI` | Web 必填 | — | Discord OAuth Callback URL |
 | `WEB_BASE_URL` | — | `/` | OAuth 完成後導回的 Web URL |
-| `SESSION_COOKIE_SECURE` | — | `false` | HTTPS 正式環境應設為 `true` |
-| `SETTINGS_DB_PATH` | — | `data/settings.db` | Guild 動態設定資料庫 |
-| `API_HOST` | — | `0.0.0.0` | Settings API listen host |
-| `API_PORT` | — | `8000` | Settings API listen port |
-| `BOT_IMAGE` | — | `ghcr.io/jontcont/discord-channel-bot-bot:latest` | NAS 使用的 Bot image |
-| `WEB_IMAGE` | — | `ghcr.io/jontcont/discord-channel-bot-web:latest` | NAS 使用的 Web image |
+| `SESSION_COOKIE_SECURE` | — | `false` | HTTPS 環境請設為 `true` |
+| `SETTINGS_DB_PATH` | — | `data/settings.db` | 伺服器動態設定 SQLite 路徑 |
+| `API_HOST` | — | `0.0.0.0` | Settings API 監聽位址 |
+| `API_PORT` | — | `8000` | Settings API 監聽埠號 |
 | `BOT_PREFIX` | — | `!` | 前綴指令符號 |
-| `LOG_LEVEL` | — | `INFO` | 日誌等級（DEBUG / INFO / WARNING / ERROR） |
-| `BOT_LANGUAGE` | — | `zh-TW` | 語系預設（如 `zh-TW` / `en-US`）。未自訂名稱時會套用對應語言預設值 |
-| `GUILD_ID` | — | — | 開發用伺服器 ID，設定後 Slash 指令會即時同步到該伺服器 |
-| `INTRODUCTION_CATEGORY` | — | 依語系 | 自我介紹分類名稱（繁中預設「一般」） |
-| `INTRODUCTION_CHANNEL` | — | 依語系 | 自我介紹文字頻道名稱（繁中預設「📝｜自我介紹」） |
-| `AUTO_VOICE_TRIGGER` | — | 依語系 | 公開語音房觸發頻道名稱 |
-| `DYNAMIC_VOICE_CREATE_ENABLED` | — | `true` | 是否允許建立動態語音房，只接受 `true` / `false` |
-| `DYNAMIC_VOICE_DELETE_ENABLED` | — | `true` | 是否允許刪除動態語音房，只接受 `true` / `false` |
-| `AUTO_VOICE_SUFFIX` | — | 依語系 | 自動建立的語音頻道後綴名 |
-| `AUTO_VOICE_LIMIT` | — | `6` | 公開語音房預設人數上限 |
-| `PRIVATE_CATEGORY` | — | 依語系 | 私人包廂分類名稱 |
-| `PRIVATE_TRIGGER` | — | 依語系 | 私人包廂觸發頻道名稱 |
-| `PRIVATE_SUFFIX` | — | 依語系 | 私人包廂頻道後綴名 |
-| `PRIVATE_LIMIT` | — | `4` | 私人包廂預設人數上限 |
-| `PASSWORD_CHANNEL` | — | 依語系 | 密碼輸入頻道名稱 |
-| `SKILL_PREFIX` | — | 依語系 | 湯技分類前綴 |
-| `SKILL_PANEL_CHANNEL` | — | 依語系 | 湯技與開房共用入口名稱，繁中預設「🎯｜社群入口」 |
-| `PARTY_NOTIFICATION_CHANNEL` | — | 依語系 | 共用入口同分類的分享通知頻道，繁中預設「📣｜揪團通知」 |
-| `SKILL_PANEL_DIRECT_JOIN_SKILLS` | — | `鍛造術,遊戲術,墨繪術` | `/skill panel` 未指定 direct_join_skills 時，預設可按鈕直接加入的湯技清單 |
-| `LEVELING_DB_PATH` | — | `data/leveling.db` | 等級資料庫檔案路徑 |
-| `XP_PER_MESSAGE_MIN` | — | `15` | 每則訊息最低 XP |
-| `XP_PER_MESSAGE_MAX` | — | `25` | 每則訊息最高 XP |
-| `XP_MESSAGE_COOLDOWN` | — | `60` | 訊息 XP 冷卻時間（秒） |
-| `XP_PER_VOICE_TICK` | — | `10` | 語音掛機每次獲得的 XP |
-| `XP_VOICE_INTERVAL` | — | `300` | 語音 XP 計算間隔（秒） |
-| `XP_DAILY_BASE` | — | `50` | 每日簽到基礎 XP |
-| `LEVELUP_CHANNEL` | — | 依語系 | 升級公告頻道名稱 |
-| `LEVEL_ROLES` | — | （內建 10 階，依語系） | 等級里程碑角色，格式：`[lv,"名稱","#HEX"],...` |
+| `LOG_LEVEL` | — | `INFO` | 日誌等級（`DEBUG` / `INFO` / `WARNING` / `ERROR`） |
+| `BOT_LANGUAGE` | — | `zh-TW` | 預設語系（`zh-TW` / `en-US`） |
+| `GUILD_ID` | — | — | 開發用伺服器 ID（設定後 Slash 指令會即時同步至該伺服器） |
+| `DYNAMIC_VOICE_CREATE_ENABLED` | — | `true` | 是否允許建立動態語音房（`true` / `false`） |
+| `DYNAMIC_VOICE_DELETE_ENABLED` | — | `true` | 是否允許刪除動態語音房（`true` / `false`） |
+| `LEVELING_DB_PATH` | — | `data/leveling.db` | 等級系統 SQLite 路徑 |
+
+> 其他頻道名稱、人數上限與經驗值參數皆有語系預設值，亦可透過 Web 設定後台動態調整；完整變數列表請見 [`.env.example`](.env.example)。
 
 ---
 

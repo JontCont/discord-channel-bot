@@ -6,6 +6,15 @@
 再依 `feature`、`bug`、`chore`、`docs`、
 `refactor`、`test` 分類。分類使用 `### 分類`，只保留有內容的分類。
 
+## 2026-11-19 - 00
+
+精簡中英文 README，移除內部部署環境細節並更新專案分層架構說明
+
+### docs
+
+- 移除 `README.md` 與 `README.en.md` 中的內部部署架構、私有映像檔路徑與自動化流程細節，避免暴露環境配置資訊。
+- 更新 `README.md` 與 `README.en.md` 的專案目錄結構，對齊 `apps/bot` 的 Clean Layered Architecture（`api/`、`cogs/`、`core/`、`models/`、`repository/`、`service/`）。
+
 ## 2026-11-14 - 04
 
 修正 Force Push 後變更紀錄驗證因舊 Base SHA 不存在而失敗的問題
